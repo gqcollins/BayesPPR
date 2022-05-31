@@ -33,12 +33,12 @@ predict.bppr <- function(object, newdata, n_ignore = 0,...){
   feat <- object$feat
   knots <- object$knots
 
-  n_it <- length(proj_dir)
-  if(n_ignore >= n_it){
-    stop('n_ignore >= n_it')
+  n_draws <- length(proj_dir)
+  if(n_ignore >= n_draws){
+    stop('n_ignore >= n_draws')
   }
-  n_keep <- n_it - n_ignore
-  it_keep <- (n_ignore + 1):n_it
+  n_keep <- n_draws - n_ignore
+  it_keep <- (n_ignore + 1):n_draws
   preds <- matrix(0, nrow = n_keep, ncol = n)
   basis_int <- matrix(rep(1, n))
   for(it in it_keep){
