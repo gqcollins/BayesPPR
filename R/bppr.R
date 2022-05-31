@@ -27,7 +27,7 @@
 #' @export
 #' @import stats
 #' @import utils
-# #' @example inst/examples.R
+#' @example inst/examples.R
 #'
 bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_act_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_draws = 10000, model = 'bppr'){
   # Pre-processing
