@@ -1,10 +1,10 @@
 Package: BayesPPR
-Title: What the Package Does (One Line, Title Case)
+Title: Bayesian Projection Pursuit Regression
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+    person("Gavin", "Collins", role = c("aut", "cre"), email = "gqcollins@gmail.com")
+Description: Bayesian fitting of projection pursuit regression model. Built to handle continuous and categorical inputs and
+    scalar output.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
