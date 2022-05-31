@@ -170,7 +170,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
         proj_dir_prop <- bias_prop <- knots_prop <- NA
-        basis_mat_star <- get_cat_basis(X[, feat_prop, drop = FALSE])
+        ridge_basis_prop <- get_cat_basis(X[, feat_prop, drop = FALSE])
         n_basis_prop <- 1
       }else{
         if(n_act_prop == 1){
