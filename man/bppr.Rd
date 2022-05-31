@@ -62,6 +62,34 @@ Fits a BayesPPR model using RJMCMC. Can handle categorical features.
 \details{
 Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 }
+\examples{
+\dontrun{
+  ################################
+  ### univariate example
+  ################################
+  ## simulate data (Friedman function)
+  f <- function(X){
+    10*sin(pi*X[,1]*X[,2]) + 20*(X[,3] - .5)^2 + 10*X[,4] + 5*X[,5]
+  }
+  n <- 500 # number of observations
+  p <- 10 #10 variables, only first 5 matter
+  X <- matrix(runif(n*p), n, p)
+  y <- f(X) + rnorm(n)
+
+  ## fit BPPR
+  fit <- bppr(X, y)
+
+  ## prediction
+  X_test <- matrix(runif(n*p), n, p)
+  preds <- predict(fit, X_test, n_ignore = 9000) # posterior predictive samples
+  true_f <- f(X_test)
+  plot(true_f, colMeans(preds), xlab = 'true values', ylab='posterior predictive means')
+  abline(a=0, b=1, col=2)
+}
+
+## minimal example for CRAN testing
+fit <- bppr(matrix(1:10), 1:10, n_draws = 2)
+}
 \seealso{
 \link{predict.bppr} for prediction.
 }
