@@ -292,7 +292,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         }else{
           proj_dir_prop <- rps(proj_dir[[it]][[j_change]], proj_dir_prop_prec) # Get proposed direction
         }
-        proj_prop <- X[, feat[[it]][[j_change]]] %*% proj_dir_prop # Get proposed projection
+        proj_prop <- X[, feat[[it]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(!is.na(knots[[it]][[j_change]][1])){ # Are any variables continuous for this ridge function?
           if(runif(1) < prob_no_relu){
@@ -346,6 +346,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     var_coefs[it] <- 1/rgamma(1,
                               var_coefs_shape + n_basis_total/2,
                               var_coefs_rate + c(t(preds) %*% preds)/(2*sd_resid[it]^2))
+
+    sse <- ssy - var_coefs[it]/(var_coefs[it] + 1) * qf_info$qf
   }
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat, proj_dir = proj_dir, bias = bias, knots = knots,
