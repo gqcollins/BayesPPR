@@ -14,11 +14,12 @@
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
 #' @param var_coefs_shape shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
 #' @param var_coefs_rate rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
-#' @param n_dat_act_min minimum number of observed non-zero values in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
+#' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param proj_dir_prop_scale scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
 #' @param n_act_w_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
 #' @param feat_w_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
 #' @param n_draws number of draws to obtain from the Markov chain.
+#' @param n_burn number of draws to burn, leaving \code{n_draws - n_burn} draws for inference
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
@@ -29,7 +30,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_act_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_draws = 10000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_draws = 10000, n_burn = 9000, model = 'bppr'){
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
@@ -83,10 +84,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
   n_act_w <- n_act_w_init
 
-  if(is.null(n_dat_act_min)){
-    n_dat_act_min <- min(20, 0.1 * n)
+  if(is.null(n_dat_min)){
+    n_dat_min <- min(20, 0.1 * n)
   }
-  p_dat_inact_max <- 1 - n_dat_act_min / n # Maximum proportion of inactive datapoints in each ridge runction
+  p_dat_max <- 1 - n_dat_min / n # Maximum proportion of inactive datapoints in each ridge runction
 
   if(is.null(n_ridge_max)){
     n_ridge_max <- min(150, floor(length(y)/df_spline) - 1)
@@ -187,7 +188,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
             ridge_basis_prop <- get_ns_basis(proj_prop, knots_prop) # Get proposed basis functions
           }else{
             min_X_proj_dir <- min(proj_prop)
-            rg <- quantile(proj_prop, p_dat_inact_max) - min_X_proj_dir
+            rg <- quantile(proj_prop, p_dat_max) - min_X_proj_dir
             bias_prop <- -(rg * runif(1) + min_X_proj_dir)
             proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
             knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
@@ -301,7 +302,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
             ridge_basis_prop <- get_ns_basis(proj_prop, knots_prop) # Get proposed basis function
           }else{
             min_X_proj_dir <- min(proj_prop)
-            rg <- quantile(proj_prop, p_dat_inact_max) - min_X_proj_dir
+            rg <- quantile(proj_prop, p_dat_max) - min_X_proj_dir
             bias_prop <- -(rg * runif(1) + min_X_proj_dir)
             proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
             knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
@@ -350,8 +351,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     sse <- ssy - var_coefs[it]/(var_coefs[it] + 1) * qf_info$qf
   }
 
-  structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat, proj_dir = proj_dir, bias = bias, knots = knots,
-                 coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
+  keep <- (n_burn + 1):n_draws
+  structure(list(n_ridge = n_ridge[keep], n_act = n_act[keep], feat = feat[keep],
+                 proj_dir = proj_dir[keep], bias = bias[keep], knots = knots[keep],
+                 coefs = coefs[keep], var_coefs = var_coefs[keep], sd_resid = sd_resid[keep],
                  n_act_w = n_act_w, feat_w = feat_w,
                  mn_X = mn_X, sd_X = sd_X,
                  df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model),

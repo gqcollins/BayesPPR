@@ -14,11 +14,12 @@ bppr(
   prob_relu = 2/3,
   var_coefs_shape = 0.5,
   var_coefs_rate = length(y)/2,
-  n_dat_act_min = NULL,
+  n_dat_min = NULL,
   proj_dir_prop_scale = NULL,
   n_act_w_init = NULL,
   feat_w_init = NULL,
   n_draws = 10000,
+  n_burn = 9000,
   model = "bppr"
 )
 }
@@ -41,7 +42,7 @@ bppr(
 
 \item{var_coefs_rate}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
 
-\item{n_dat_act_min}{minimum number of observed non-zero values in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
+\item{n_dat_min}{minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
 
 \item{proj_dir_prop_scale}{scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.}
 
@@ -50,6 +51,8 @@ bppr(
 \item{feat_w_init}{vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.}
 
 \item{n_draws}{number of draws to obtain from the Markov chain.}
+
+\item{n_burn}{number of draws to burn, leaving \code{n_draws - n_burn} draws for inference}
 
 \item{model}{"bppr" is the only valid option as of now.}
 }
@@ -83,7 +86,7 @@ Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x
   X_test <- matrix(runif(n*p), n, p)
   preds <- predict(fit, X_test, n_ignore = 9000) # posterior predictive samples
   true_f <- f(X_test)
-  plot(true_f, colMeans(preds), xlab = 'true values', ylab='posterior predictive means')
+  plot(true_f, colMeans(preds), xlab = 'true values', ylab = 'posterior predictive means')
   abline(a=0, b=1, col=2)
 }
 

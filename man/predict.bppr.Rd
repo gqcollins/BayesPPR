@@ -4,14 +4,14 @@
 \alias{predict.bppr}
 \title{BayesPPR Predictions}
 \usage{
-\method{predict}{bppr}(object, newdata, n_ignore = 0, ...)
+\method{predict}{bppr}(object, newdata, idx_use = NULL, ...)
 }
 \arguments{
 \item{object}{a fitted model, output from the \code{bppr} function.}
 
 \item{newdata}{a matrix of new input values at which to predict.  The columns should correspond to the same variables used in the \code{bppr} function.}
 
-\item{n_ignore}{number of samples to ignore at the beginning of the Markov chain, when generating predictions.}
+\item{idx_use}{index of Markov samples to use when generating predictions.}
 
 \item{...}{further arguments passed to or from other methods.}
 }
