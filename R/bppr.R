@@ -18,8 +18,8 @@
 #' @param proj_dir_prop_scale scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
 #' @param n_act_w_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
 #' @param feat_w_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
-#' @param n_draws number of draws to obtain from the Markov chain.
-#' @param n_burn number of draws to burn, leaving \code{n_draws - n_burn} draws for inference
+#' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
+#' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
@@ -30,7 +30,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_draws = 10000, n_burn = 9000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_post = 1000, n_burn = 9000, model = 'bppr'){
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
@@ -66,8 +66,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
 
   if(is.null(n_act_max)){
-    p_cat <- sum(feat_type == 'cat')
-    n_act_max <- min(3, p - p_cat) + min(3, ceiling(p_cat/2))
+    n_cat <- sum(feat_type == 'cat')
+    n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
   }
 
   if(is.null(proj_dir_prop_scale)){
@@ -98,6 +98,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   prob_no_relu <- 1 - prob_relu
 
   # Initialization
+  n_draws <- n_burn + n_post
   sd_resid <- numeric(n_draws) # Error standard deviation
   sd_resid[1] <- 1
 
@@ -351,10 +352,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     sse <- ssy - var_coefs[it]/(var_coefs[it] + 1) * qf_info$qf
   }
 
-  keep <- (n_burn + 1):n_draws
-  structure(list(n_ridge = n_ridge[keep], n_act = n_act[keep], feat = feat[keep],
-                 proj_dir = proj_dir[keep], bias = bias[keep], knots = knots[keep],
-                 coefs = coefs[keep], var_coefs = var_coefs[keep], sd_resid = sd_resid[keep],
+  idx_post <- (n_burn + 1):n_draws
+  structure(list(n_ridge = n_ridge[idx_post], n_act = n_act[idx_post], feat = feat[idx_post],
+                 proj_dir = proj_dir[idx_post], bias = bias[idx_post], knots = knots[idx_post],
+                 coefs = coefs[idx_post], var_coefs = var_coefs[idx_post], sd_resid = sd_resid[idx_post],
                  n_act_w = n_act_w, feat_w = feat_w,
                  mn_X = mn_X, sd_X = sd_X,
                  df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model),

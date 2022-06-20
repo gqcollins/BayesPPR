@@ -10,7 +10,7 @@
 #' @param idx_use index of Markov samples to use when generating predictions.
 #' @param ... further arguments passed to or from other methods.
 #' @details bare-bones methods. Could be improved for efficiency.
-#' #' @return This returns a matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations after the first \code{n_ignore}.  These are samples from the posterior predictive distribution.
+#' #' @return This returns a matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations indexed by idx_use. These are samples from the posterior predictive distribution.
 #' @seealso \link{bppr} for model fitting.
 #' @export
 #' @examples
@@ -33,11 +33,11 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
   feat <- object$feat
   knots <- object$knots
 
-  n_keep <- length(proj_dir)
+  n_post <- length(proj_dir)
   if(is.null(idx_use)){
-    idx_use <- 1:n_keep
-    n_use <- n_keep
-  }else if(max(idx_use) > n_keep){
+    idx_use <- 1:n_post
+    n_use <- n_post
+  }else if(max(idx_use) > n_post){
     stop("invalid 'idx_use'")
   }else{
     n_use <- length(idx_use)
