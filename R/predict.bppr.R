@@ -33,11 +33,11 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
   feat <- object$feat
   knots <- object$knots
 
-  n_post <- length(proj_dir)
+  n_keep <- length(proj_dir)
   if(is.null(idx_use)){
-    idx_use <- 1:n_post
-    n_use <- n_post
-  }else if(max(idx_use) > n_post){
+    idx_use <- 1:n_keep
+    n_use <- n_keep
+  }else if(max(idx_use) > n_keep){
     stop("invalid 'idx_use'")
   }else{
     n_use <- length(idx_use)
