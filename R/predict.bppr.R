@@ -4,13 +4,13 @@
 
 #' @title BayesPPR Predictions
 #'
-#' @description Predict function for BayesPPR  Outputs the posterior predictive samples for the desired MCMC iterations.
+#' @description Predict function for BayesPPR. Outputs the posterior predictive samples for the desired MCMC iterations.
 #' @param object a fitted model, output from the \code{bppr} function.
 #' @param newdata a matrix of new input values at which to predict.  The columns should correspond to the same variables used in the \code{bppr} function.
 #' @param idx_use index of Markov samples to use when generating predictions.
 #' @param ... further arguments passed to or from other methods.
-#' @details bare-bones methods. Could be improved for efficiency.
-#' #' @return This returns a matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations indexed by idx_use. These are samples from the posterior predictive distribution.
+#' @details Bare-bones methods. Could be improved for efficiency.
+#' @return A matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations indexed by idx_use. These are samples from the posterior predictive distribution.
 #' @seealso \link{bppr} for model fitting.
 #' @export
 #' @examples

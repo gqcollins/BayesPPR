@@ -2,7 +2,7 @@
 ## main BayesPPR function
 ########################################################################
 
-#' @title Bayesian Projection Pursuit Regression (BayesPPR)
+#' @title Bayesian Projection Pursuit Regression
 #'
 #' @description Fits a BayesPPR model using RJMCMC. Can handle categorical features.
 #' @param X a data frame or matrix of predictors. Categorical features should be coded as numeric.
@@ -12,12 +12,12 @@
 #' @param n_act_max maximum number of active variables in any given ridge function. Defaults to 3 unless categorical features are detected, in which case the default is larger.
 #' @param df_spline degrees of freedom for spline basis. Stability should be examined for anything other than 4.
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
-#' @param var_coefs_shape shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
-#' @param var_coefs_rate rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
+#' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
+#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
-#' @param proj_dir_prop_scale scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
-#' @param n_act_w_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
-#' @param feat_w_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
+#' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
+#' @param w_n_act_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
+#' @param w_feat_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
 #' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
 #' @param model "bppr" is the only valid option as of now.
@@ -30,15 +30,15 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, var_coefs_shape = 0.5, var_coefs_rate = length(y)/2, n_dat_min = NULL, proj_dir_prop_scale = NULL, n_act_w_init = NULL, feat_w_init = NULL, n_post = 1000, n_burn = 9000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = 0.5, rate_var_coefs = length(y)/2, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, model = 'bppr'){
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
 
-  if(is.null(feat_w_init)){
-    feat_w_init <- rep(1, p)
+  if(is.null(w_feat_init)){
+    w_feat_init <- rep(1, p)
   }
-  feat_w <- feat_w_init
+  w_feat <- w_feat_init
 
   mn_X <- sd_X <- numeric(p)
   feat_type <- character(p)
@@ -49,7 +49,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       sd_X[j] <- 1
       if(n_unique == 1){
         feat_type[j] <- ''
-        feat_w_init[j] <- 0
+        w_feat_init[j] <- 0
       }else{
         feat_type[j] <- 'cat'
       }
@@ -70,27 +70,34 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
   }
 
-  if(is.null(proj_dir_prop_scale)){
-    proj_dir_prop_prec <- 1000 # proj_dir_prop_scale = 0.002
-  }else if(proj_dir_prop_scale > 1  ||  proj_dir_prop_scale <= 0){
+  if(is.null(scale_proj_dir_prop)){
+    proj_dir_prop_prec <- 1000 # scale_proj_dir_prop = 0.002
+  }else if(scale_proj_dir_prop > 1  ||  scale_proj_dir_prop <= 0){
     stop("scale prop must be in (0, 1]")
   }else{
-    proj_dir_prop_prec <- 1/proj_dir_prop_scale
+    proj_dir_prop_prec <- 1/scale_proj_dir_prop
     proj_dir_prop_prec <- (proj_dir_prop_prec - 1) + sqrt(proj_dir_prop_prec * (proj_dir_prop_prec - 1))
   }
 
-  if(is.null(n_act_w_init)){
-    n_act_w_init <- rep(1, n_act_max)
+  if(is.null(w_n_act_init)){
+    w_n_act_init <- rep(1, n_act_max)
   }
-  n_act_w <- n_act_w_init
+  w_n_act <- w_n_act_init
 
   if(is.null(n_dat_min)){
     n_dat_min <- min(20, 0.1 * n)
   }
-  p_dat_max <- 1 - n_dat_min / n # Maximum proportion of inactive datapoints in each ridge runction
+  if(n_dat_min <= df_spline){
+    warning('n_dat_min too small. If n_dat_min was set by default, df_spline is large compared to the sample size. Setting n_dat_min = df_spline + 1')
+    n_dat_min <- df_spline + 1
+  }
+  p_dat_max <- 1 - n_dat_min / n # Maximum proportion of inactive datapoints in each ridge function
 
   if(is.null(n_ridge_max)){
-    n_ridge_max <- min(150, floor(length(y)/df_spline) - 1)
+    n_ridge_max <- min(150, floor(length(y)/df_spline) - 2)
+  }
+  if(n_ridge_max <= 0){
+    stop('n_ridge_max <= 0. If n_ridge_max was set by default, df_spline is too large compared to the sample size.')
   }
 
   knot_quants <- seq(0, 1, length.out = df_spline + 1) # Quantiles for knot locations
@@ -106,7 +113,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   coefs[[1]] <- mean(y)
 
   var_coefs <- numeric(n_draws)
-  var_coefs[1] <- 1/rgamma(1, var_coefs_shape, var_coefs_rate)
+  var_coefs[1] <- 1/rgamma(1, shape_var_coefs, rate_var_coefs)
 
   n_ridge <- numeric(n_draws) # Number of ridge functions
   n_act <- lapply(1:n_draws, function(it) numeric()) # Number of active features for jth ridge function
@@ -161,13 +168,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
 
     if(move_type == 'birth'){ # Birth step
-      n_act_prop <- sample(n_act_max, 1, prob = n_act_w) # Propose number of active features
-      alpha0 <- alpha0 - (log(n_act_max) + log(n_act_w[n_act_prop]/sum(n_act_w))) # Nott, Kuk, Duc for n_act
+      n_act_prop <- sample(n_act_max, 1, prob = w_n_act) # Propose number of active features
+      alpha0 <- alpha0 - (log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
       if(n_act_prop == 1){
         feat_prop <- sample(p, 1)
       }else{
-        feat_prop <- sample(p, n_act_prop, prob = feat_w) # Propose features to include
-        alpha0 <- alpha0 - (lchoose(p, n_act_prop) + log(dwallenius(feat_w, feat_prop))) # Nott, Kuk, Duc for feat
+        feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
+        alpha0 <- alpha0 - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
       }
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
@@ -227,8 +234,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           basis_mat <- basis_mat_prop
 
           #Update weights
-          n_act_w[n_act_prop] <- n_act_w[n_act_prop] + 1
-          feat_w[feat_prop] <- feat_w[feat_prop] + 1
+          w_n_act[n_act_prop] <- w_n_act[n_act_prop] + 1
+          w_feat[feat_prop] <- w_feat[feat_prop] + 1
 
           qf_info <- qf_info_prop
           qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
@@ -239,13 +246,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       j_death <- sample(n_ridge[it], 1) # Choose random index to delete
 
       n_act_prop <- n_act[[it]][j_death]
-      alpha0 <- alpha0 + log(n_act_max) + log((n_act_w[n_act_prop] - 1)/(sum(n_act_w) - 1))
+      alpha0 <- alpha0 + log(n_act_max) + log((w_n_act[n_act_prop] - 1)/(sum(w_n_act) - 1))
 
       feat_prop <- feat[[it]][[j_death]]
-      feat_w_prop <- feat_w;
-      feat_w_prop[feat_prop] <- feat_w_prop[feat_prop] - 1
+      w_feat_prop <- w_feat;
+      w_feat_prop[feat_prop] <- w_feat_prop[feat_prop] - 1
       if(n_act_prop > 1){
-        alpha0 <- alpha0 + lchoose(p, n_act_prop) + log(dwallenius(feat_w_prop, feat_prop)) # Nott, Kuk, and Duc
+        alpha0 <- alpha0 + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
       }
 
       basis_mat_prop <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
@@ -278,8 +285,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           basis_mat <- basis_mat_prop
 
           # Update weights
-          feat_w <- feat_w_prop
-          n_act_w[n_act_prop] <- n_act_w[n_act_prop] - 1
+          w_feat <- w_feat_prop
+          w_n_act[n_act_prop] <- w_n_act[n_act_prop] - 1
 
           qf_info <- qf_info_prop
           qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
@@ -346,8 +353,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     sd_resid[it] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
 
     var_coefs[it] <- 1/rgamma(1,
-                              var_coefs_shape + n_basis_total/2,
-                              var_coefs_rate + c(t(preds) %*% preds)/(2*sd_resid[it]^2))
+                              shape_var_coefs + n_basis_total/2,
+                              rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[it]^2))
 
     sse <- ssy - var_coefs[it]/(var_coefs[it] + 1) * qf_info$qf
   }
@@ -356,7 +363,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   structure(list(n_ridge = n_ridge[idx_post], n_act = n_act[idx_post], feat = feat[idx_post],
                  proj_dir = proj_dir[idx_post], bias = bias[idx_post], knots = knots[idx_post],
                  coefs = coefs[idx_post], var_coefs = var_coefs[idx_post], sd_resid = sd_resid[idx_post],
-                 n_act_w = n_act_w, feat_w = feat_w,
+                 w_n_act = w_n_act, w_feat = w_feat,
                  mn_X = mn_X, sd_X = sd_X,
                  df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model),
             class = 'bppr')
