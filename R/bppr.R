@@ -172,9 +172,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     bias[[idx[it]]] <- bias[[idx[it - 1]]]
     proj_dir[[idx[it]]] <- proj_dir[[idx[it - 1]]]
 
-    qf_info <- get_qf_info(basis_mat, y)
-    qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
-
     # Perform Reversible Jump Step (birth, death, change)
     if(n_ridge[idx[it]] == 0){
       move_type <- 'birth'
