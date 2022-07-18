@@ -16,11 +16,11 @@
 
   ## prediction
   X_test <- matrix(runif(n*p), n, p)
-  preds <- predict(fit, X_test, n_ignore = 9000) # posterior predictive samples
+  preds <- predict(fit, X_test) # posterior predictive samples
   true_f <- f(X_test)
   plot(true_f, colMeans(preds), xlab = 'true values', ylab = 'posterior predictive means')
   abline(a=0, b=1, col=2)
 }
 
 ## minimal example for CRAN testing
-fit <- bppr(matrix(1:10), 1:10, n_draws = 2)
+fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0)

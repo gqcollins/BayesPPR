@@ -15,12 +15,14 @@
 
 \item{...}{further arguments passed to or from other methods.}
 }
+\value{
+A matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations indexed by idx_use. These are samples from the posterior predictive distribution.
+}
 \description{
-Predict function for BayesPPR  Outputs the posterior predictive samples for the desired MCMC iterations.
+Predict function for BayesPPR. Outputs the posterior predictive samples for the desired MCMC iterations.
 }
 \details{
-bare-bones methods. Could be improved for efficiency.
-#' @return This returns a matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations after the first \code{n_ignore}.  These are samples from the posterior predictive distribution.
+Bare-bones methods. Could be improved for efficiency.
 }
 \examples{
 # See examples in bppr documentation.

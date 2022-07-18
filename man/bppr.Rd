@@ -2,7 +2,7 @@
 % Please edit documentation in R/bppr.R
 \name{bppr}
 \alias{bppr}
-\title{Bayesian Projection Pursuit Regression (BayesPPR)}
+\title{Bayesian Projection Pursuit Regression}
 \usage{
 bppr(
   X,
@@ -12,14 +12,16 @@ bppr(
   n_act_max = NULL,
   df_spline = 4,
   prob_relu = 2/3,
-  var_coefs_shape = 0.5,
-  var_coefs_rate = length(y)/2,
+  shape_var_coefs = 0.5,
+  rate_var_coefs = length(y)/2,
   n_dat_min = NULL,
-  proj_dir_prop_scale = NULL,
-  n_act_w_init = NULL,
-  feat_w_init = NULL,
-  n_draws = 10000,
+  scale_proj_dir_prop = NULL,
+  w_n_act_init = NULL,
+  w_feat_init = NULL,
+  n_post = 1000,
   n_burn = 9000,
+  n_thin = 1,
+  print_every = 1000,
   model = "bppr"
 )
 }
@@ -38,21 +40,25 @@ bppr(
 
 \item{prob_relu}{prior probability that any given ridge function uses a relu transformation.}
 
-\item{var_coefs_shape}{shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
+\item{shape_var_coefs}{shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
 
-\item{var_coefs_rate}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
+\item{rate_var_coefs}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
 
 \item{n_dat_min}{minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
 
-\item{proj_dir_prop_scale}{scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.}
+\item{scale_proj_dir_prop}{scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.}
 
-\item{n_act_w_init}{vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.}
+\item{w_n_act_init}{vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.}
 
-\item{feat_w_init}{vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.}
+\item{w_feat_init}{vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.}
 
-\item{n_draws}{number of draws to obtain from the Markov chain.}
+\item{n_post}{number of posterior draws to obtain from the Markov chain after burn-in.}
 
-\item{n_burn}{number of draws to burn, leaving \code{n_draws - n_burn} draws for inference}
+\item{n_burn}{number of draws to burn before obtaining \code{n_post} draws for inference.}
+
+\item{n_thin}{keep every n_thin posterior draws after burn-in.}
+
+\item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
 
 \item{model}{"bppr" is the only valid option as of now.}
 }
@@ -84,14 +90,14 @@ Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x
 
   ## prediction
   X_test <- matrix(runif(n*p), n, p)
-  preds <- predict(fit, X_test, n_ignore = 9000) # posterior predictive samples
+  preds <- predict(fit, X_test) # posterior predictive samples
   true_f <- f(X_test)
   plot(true_f, colMeans(preds), xlab = 'true values', ylab = 'posterior predictive means')
   abline(a=0, b=1, col=2)
 }
 
 ## minimal example for CRAN testing
-fit <- bppr(matrix(1:10), 1:10, n_draws = 2)
+fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0)
 }
 \seealso{
 \link{predict.bppr} for prediction.

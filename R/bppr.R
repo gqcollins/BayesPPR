@@ -21,7 +21,7 @@
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
 #' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
-#' @param print_every print the iteration number every print_every iterations.
+#' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
