@@ -54,11 +54,7 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
         }else if(is.na(knots[[idx_use[i]]][[j]][1])){ # No continuous features in this basis
           ridge_basis <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
         }else{ # At least one continuous variable in this basis
-          if(is.na(bias[[idx_use[i]]][j])){ # No knot or relu in this basis
-            proj <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
-          }else{ # Relu present
-            proj <- relu(bias[[idx_use[i]]][j] + newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]) # Get relu of projection
-          }
+          proj <- relu(bias[[idx_use[i]]][j] + newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]) # Get relu of projection
           ridge_basis <- get_ns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
         }
         basis_mat <- cbind(basis_mat, ridge_basis)

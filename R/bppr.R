@@ -113,8 +113,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
   knot_quants <- seq(0, 1, length.out = df_spline + 1) # Quantiles for knot locations
 
-  prob_no_relu <- 1 - prob_relu
-
   # Initialization
   sd_resid <- numeric(n_keep) # Error standard deviation
   sd_resid[1] <- 1
@@ -213,18 +211,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         proj_prop <- X[, feat_prop, drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(any(feat_type[feat_prop] == 'cont')){ # Are any proposed features continuous?
-          if(runif(1) < prob_no_relu){ # Try not using relu with some probability
-            bias_prop <- NA
-            knots_prop <- quantile(proj_prop, knot_quants) # Get proposed knots
-            ridge_basis_prop <- get_ns_basis(proj_prop, knots_prop) # Get proposed basis functions
-          }else{
-            min_X_proj_dir <- min(proj_prop)
-            rg <- quantile(proj_prop, p_dat_max) - min_X_proj_dir
-            bias_prop <- -(rg * runif(1) + min_X_proj_dir)
-            proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
-            knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
-            ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis functions
-          }
+          min_proj <- min(proj_prop)
+          min_bias <- -quantile(proj_prop, p_dat_max)
+          rg_bias <- (-min_proj - min_bias) / prob_relu
+          bias_prop <- rg_bias * runif(1) + min_bias
+          proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
+          knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
+          ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis functions
           n_basis_prop <- df_spline
         }else{ # The proposed features are a mix of categorical and discrete quantitative
           bias_prop <- knots_prop <- NA
@@ -327,18 +320,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         proj_prop <- X[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(!is.na(knots[[idx[it]]][[j_change]][1])){ # Are any variables continuous for this ridge function?
-          if(runif(1) < prob_no_relu){
-            bias_prop <- NA
-            knots_prop <- quantile(proj_prop, knot_quants) # Get proposed knots
-            ridge_basis_prop <- get_ns_basis(proj_prop, knots_prop) # Get proposed basis function
-          }else{
-            min_X_proj_dir <- min(proj_prop)
-            rg <- quantile(proj_prop, p_dat_max) - min_X_proj_dir
-            bias_prop <- -(rg * runif(1) + min_X_proj_dir)
-            proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
-            knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
-            ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis function
-          }
+          min_proj <- min(proj_prop)
+          min_bias <- -quantile(proj_prop, p_dat_max)
+          rg_bias <- (-min_proj - min_bias) / prob_relu
+          bias_prop <- rg_bias * runif(1) + min_bias
+          proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
+          knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
+          ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis function
         }else{
           bias_prop <- knots_prop <- NA
           ridge_basis_prop <- proj_prop
@@ -376,8 +364,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
 
     var_coefs[idx[it]] <- 1/rgamma(1,
-                              shape_var_coefs + n_basis_total/2,
-                              rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
+                                   shape_var_coefs + n_basis_total/2,
+                                   rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
 
     sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
   }
