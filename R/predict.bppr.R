@@ -32,6 +32,7 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
   n_act <- object$n_act
   feat <- object$feat
   knots <- object$knots
+  df_spline <- object$df_spline
 
   n_keep <- length(proj_dir)
   if(is.null(idx_use)){
@@ -44,23 +45,28 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
   }
 
   preds <- matrix(0, nrow = n_use, ncol = n)
-  basis_int <- matrix(rep(1, n))
   for(i in 1:n_use){
-    basis_mat <- basis_int
+    preds[i, ] <- coefs[[idx_use[i]]][1]
     if(n_ridge[idx_use[i]] > 0){
+      basis_idx_start <- 2
       for(j in 1:n_ridge[idx_use[i]]){
         if(is.na(proj_dir[[idx_use[i]]][[j]][1])){ # No quantitative feature in this basis
           ridge_basis <- get_cat_basis(newdata[, feat[[idx_use[i]]][[j]], drop = FALSE])
+          basis_idx <- basis_idx_start
+          basis_idx_start <- basis_idx_start + 1
         }else if(is.na(knots[[idx_use[i]]][[j]][1])){ # No continuous features in this basis
           ridge_basis <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
+          basis_idx <- basis_idx_start
+          basis_idx_start <- basis_idx_start + 1
         }else{ # At least one continuous variable in this basis
           proj <- relu(bias[[idx_use[i]]][j] + newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]) # Get relu of projection
           ridge_basis <- get_ns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
+          basis_idx <- basis_idx_start:(basis_idx_start + df_spline - 1)
+          basis_idx_start <- basis_idx_start + df_spline
         }
-        basis_mat <- cbind(basis_mat, ridge_basis)
+        preds[i, ] <- preds[i, ] + ridge_basis %*% coefs[[idx_use[i]]][basis_idx] # Get predictions for jth basis function
       }
     }
-    preds[i, ] <- basis_mat %*% coefs[[idx_use[i]]] # Get predictions for jth basis function
   }
 
   return(preds)
