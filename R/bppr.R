@@ -155,15 +155,17 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     phase <- 'post'
   }
   if(print_every > 0){
+    silent <- FALSE
     print(paste0('it = 1/', n_draws, ' (', phase, ')'))
   }else{
     print_every <- n_draws + 2
+    silent <- TRUE
   }
 
   # Run MCMC
   for(it in 2:n_draws){
     if(it == n_burn + 1) phase <- 'post'
-    if((it - 1) %% print_every == 0  ||  it == n_burn + 1){
+    if((it - 1) %% print_every == 0  ||  (it == n_burn + 1  &&  !silent)){
       print(paste0('it = ', it, '/', n_draws, ' (', phase, ')'))
     }
 
@@ -378,7 +380,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
   }
 
-  print('done')
+  if(!silent){
+    print('done')
+  }
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,
                  proj_dir = proj_dir, bias = bias, knots = knots,
