@@ -24,7 +24,7 @@
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
-#' @return An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
+#' @return An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
 #' @keywords nonparametric projection pursuit regression splines
 #' @seealso \link{predict.bppr} for prediction.
 #' @export
@@ -32,7 +32,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = 0.5, rate_var_coefs = length(y)/2, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
@@ -79,6 +79,14 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   if(is.null(n_act_max)){
     n_cat <- sum(feat_type == 'cat')
     n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
+  }
+
+  if(is.null(shape_var_coefs)){
+    shape_var_coefs <- 0.5
+  }
+
+  if(is.null(rate_var_coefs)){
+    rate_var_coefs <- n/2
   }
 
   if(is.null(scale_proj_dir_prop)){
@@ -377,6 +385,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                  coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
                  w_n_act = w_n_act, w_feat = w_feat,
                  mn_X = mn_X, sd_X = sd_X,
-                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model),
+                 df_spline = df_spline, n_ridge_mean = n_ridge_mean,
+                 n_keep = n_keep, model = model),
             class = 'bppr')
 }

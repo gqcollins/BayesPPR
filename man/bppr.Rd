@@ -12,8 +12,8 @@ bppr(
   n_act_max = NULL,
   df_spline = 4,
   prob_relu = 2/3,
-  shape_var_coefs = 0.5,
-  rate_var_coefs = length(y)/2,
+  shape_var_coefs = NULL,
+  rate_var_coefs = NULL,
   n_dat_min = NULL,
   scale_proj_dir_prop = NULL,
   w_n_act_init = NULL,
@@ -63,7 +63,7 @@ bppr(
 \item{model}{"bppr" is the only valid option as of now.}
 }
 \value{
-An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
+An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
 }
 \description{
 Fits a BayesPPR model using RJMCMC. Can handle categorical features.
