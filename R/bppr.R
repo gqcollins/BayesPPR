@@ -156,7 +156,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
   if(print_every > 0){
     silent <- FALSE
-    print(paste0('it = 1/', n_draws, ' (', phase, ')'))
+    cat(paste0('it = 1/', n_draws, ' (', phase, ') \n'))
   }else{
     print_every <- n_draws + 2
     silent <- TRUE
@@ -166,7 +166,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   for(it in 2:n_draws){
     if(it == n_burn + 1) phase <- 'post'
     if((it - 1) %% print_every == 0  ||  (it == n_burn + 1  &&  !silent)){
-      print(paste0('it = ', it, '/', n_draws, ' (', phase, ')'))
+      cat(paste0('it = ', it, '/', n_draws, ' (', phase, ') \n'))
     }
 
     # Set current it values to last it values (these will change during the iteration)
@@ -381,7 +381,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
 
   if(!silent){
-    print('done')
+    cat('done \n')
   }
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,

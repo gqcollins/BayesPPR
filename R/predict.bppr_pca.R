@@ -2,7 +2,7 @@
 ## prediction function for multivariate response
 ########################################################################
 
-#' @title BayesPPR Predictions for MUltivariate Response
+#' @title BayesPPR Predictions for Multivariate Response
 #'
 #' @description Predict function for BayesPPR. Outputs the posterior predictive samples for the desired MCMC iterations.
 #' @param object a fitted model, output from the \code{bppr} function.

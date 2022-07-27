@@ -25,7 +25,7 @@
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
 #' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
-#' @param print_every print the iteration number every print_every iterations. Default is \code{print_every = 0}, which silences output.
+#' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class \code{"bppr_pca"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr_pca} function.
@@ -37,7 +37,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 0, model = 'bppr'){
+bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = NULL, model = 'bppr'){
 
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc
@@ -49,6 +49,14 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
                    min(n_cores, n_pc, n_cores_max)))
   }
   n_cores <- min(n_cores, n_pc, n_cores_max)
+
+  if(is.null(print_every)){
+    if(n_cores == 1){
+      print_every <- 1000
+    }else{
+      print_every <- 0
+    }
+  }
 
   run_bppr <- parse(text =
   "bppr(X, pca_Y$Y_new[, i], n_ridge_mean = n_ridge_mean, n_ridge_max = n_ridge_max,

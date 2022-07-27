@@ -2,7 +2,7 @@
 % Please edit documentation in R/predict.bppr_pca.R
 \name{predict.bppr_pca}
 \alias{predict.bppr_pca}
-\title{BayesPPR Predictions for MUltivariate Response}
+\title{BayesPPR Predictions for Multivariate Response}
 \usage{
 \method{predict}{bppr_pca}(object, newdata, idx_use = NULL, n_cores = 1, par_type = "fork", ...)
 }

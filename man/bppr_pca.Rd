@@ -25,7 +25,7 @@ bppr_pca(
   n_post = 1000,
   n_burn = 9000,
   n_thin = 1,
-  print_every = 0,
+  print_every = NULL,
   model = "bppr"
 )
 }
@@ -70,7 +70,7 @@ bppr_pca(
 
 \item{n_thin}{keep every n_thin posterior draws after burn-in.}
 
-\item{print_every}{print the iteration number every print_every iterations. Default is \code{print_every = 0}, which silences output.}
+\item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
 
 \item{model}{"bppr" is the only valid option as of now.}
 }
