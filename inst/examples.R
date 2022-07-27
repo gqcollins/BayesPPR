@@ -18,8 +18,8 @@
   X_test <- matrix(runif(n*p), n, p)
   preds <- predict(fit, X_test) # posterior predictive samples
   true_f <- f(X_test)
-  plot(true_f, colMeans(preds), xlab = 'true values', ylab = 'posterior predictive means')
-  abline(a=0, b=1, col=2)
+  plot(true_f, colMeans(preds), xlab = 'True Value', ylab = 'Posterior Predictive Mean')
+  abline(a = 0, b = 1, col = 2)
 }
 
 ## minimal example for CRAN testing

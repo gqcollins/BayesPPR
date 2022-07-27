@@ -42,8 +42,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_keep <- n_post/n_thin
   idx <- c(rep(1, n_burn), rep(1:n_keep, each = n_thin))
 
-  X.unst <- X
-
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
@@ -54,6 +52,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   w_feat <- w_feat_init
 
   mn_X <- sd_X <- numeric(p)
+  X_st <- X
   feat_type <- character(p)
   for(j in 1:p){
     n_unique <- length(unique(X[, j]))
@@ -69,7 +68,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }else{
       mn_X[j] <- mean(X[, j])
       sd_X[j] <- sd(X[, j])
-      X[, j] <- (X[, j] - mn_X[j]) / sd_X[j]
+      X_st[, j] <- (X[, j] - mn_X[j]) / sd_X[j]
       if(n_unique <= df_spline){
         feat_type[j] <- 'disc'
       }else{
@@ -154,12 +153,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   if(n_burn > 0){
     phase <- 'burn'
   }else{
-    phase <- 'post'
+    phase <- 'post-burn'
   }
   if(print_every > 0){
-    cat('MCMC Start',myTimestamp(),'n ridge: 0','\n')
+    start_time <- Sys.time()
+    cat(paste0('MCMC iteration 1/', n_draws, ' (', phase, ') ',
+               myTimestamp(), ' n ridge: 0', '\n'))
     silent <- FALSE
-    cat(paste0('it = 1/', n_draws, ' (', phase, ') \n'))
   }else{
     print_every <- n_draws + 2
     silent <- TRUE
@@ -168,9 +168,11 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
   # Run MCMC
   for(it in 2:n_draws){
-    if(it == n_burn + 1) phase <- 'post'
+    if(it == n_burn + 1) phase <- 'post-burn'
     if((it - 1) %% print_every == 0  ||  (it == n_burn + 1  &&  !silent)){
-      cat(paste0('it = ', it, '/', n_draws, ' (', phase, ') \n'))
+      pr <- paste0('MCMC iteration ', it, '/', n_draws, ' (', phase, ') ',
+                   myTimestamp(start_time), ' n ridge: ', n_ridge[idx[it]])
+      cat(pr, '\n')
     }
 
     # Set current it values to last it values (these will change during the iteration)
@@ -214,7 +216,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
         proj_dir_prop <- bias_prop <- knots_prop <- NA
-        ridge_basis_prop <- get_cat_basis(X[, feat_prop, drop = FALSE])
+        ridge_basis_prop <- get_cat_basis(X_st[, feat_prop, drop = FALSE])
         n_basis_prop <- 1
       }else{
         if(n_act_prop == 1){
@@ -222,7 +224,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         }else{
           proj_dir_prop <- rps(proj_dir_mn[[n_act_prop]], 0) # Propose direction
         }
-        proj_prop <- X[, feat_prop, drop = FALSE] %*% proj_dir_prop # Get proposed projection
+        proj_prop <- X_st[, feat_prop, drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(any(feat_type[feat_prop] == 'cont')){ # Are any proposed features continuous?
           min_proj <- min(proj_prop)
@@ -331,7 +333,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         }else{
           proj_dir_prop <- rps(proj_dir[[idx[it]]][[j_change]], proj_dir_prop_prec) # Get proposed direction
         }
-        proj_prop <- X[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
+        proj_prop <- X_st[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(!is.na(knots[[idx[it]]][[j_change]][1])){ # Are any variables continuous for this ridge function?
           min_proj <- min(proj_prop)
@@ -382,17 +384,11 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                                    rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
 
     sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
-
-    #browser()
-    if(it %% print_every == 0){
-      pr<-c('MCMC iteration',it,myTimestamp(),'n ridge:',n_ridge[idx[it]])
-      cat(pr,'\n')
-    }
-
   }
 
   if(!silent){
-    cat('done \n')
+    cat(paste0('MCMC iteration ', n_draws, '/', n_draws, ' (', phase, ') ',
+               myTimestamp(start_time), ' n ridge: ', n_ridge[idx[it]], '\n'))
   }
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,
@@ -400,11 +396,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                  coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
                  w_n_act = w_n_act, w_feat = w_feat,
                  mn_X = mn_X, sd_X = sd_X,
-                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model, X=X.unst, y=y, call=match.call()),
+                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model,
+                 n_post = n_post, n_burn = n_burn, n_thin = n_thin, n_keep = n_keep, X = X, y = y, call = match.call()),
             class = 'bppr')
-}
-
-myTimestamp<-function(){
-  x<-Sys.time()
-  paste('#--',format(x,"%b %d %X"),'--#')
 }

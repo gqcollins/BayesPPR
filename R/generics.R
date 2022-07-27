@@ -6,11 +6,11 @@
 #' @param ... further arguments passed to or from other methods.
 #' @export
 #'
-print.bppr<-function(x,...){
-  cat("\nCall:\n",deparse(x$call),'\n')
+print.bppr <- function(x, ...){
+  cat("\nCall:\n", deparse(x$call), '\n')
 
-  cat("\n              Number of variables: ",ncol(x$X),sep='')
-  cat("\n                      Sample size: ",nrow(x$X),sep='')
+  cat("\n              Number of variables: ", ncol(x$X), sep = '')
+  cat("\n                      Sample size: ", nrow(x$X), sep = '')
 
   cat('\n\n')
 
@@ -24,15 +24,13 @@ print.bppr<-function(x,...){
 #' @param ... further arguments passed to or from other methods.
 #' @export
 #'
-summary.bppr<-function(object,...){
-  cat("\nCall:\n",deparse(object$call),'\n')
+summary.bppr <- function(object,...){
+  cat("\nCall:\n", deparse(object$call), '\n')
 
-  cat("\n              Number of variables: ",ncol(object$X),sep='')
-  cat("\n                      Sample size: ",nrow(object$X),sep='')
+  cat("\n              Number of variables: ", ncol(object$X), sep = '')
+  cat("\n                      Sample size: ", nrow(object$X), sep = '')
 
-  cat("\n\nNumber of ridge functions (range):",range(object$n_ridge))
-  cat("\n    Posterior mean error sd:",mean(object$sd_resid),'\n\n')
+  cat("\n\n Number of ridge functions (range):", range(object$n_ridge))
+  cat("\n    Posterior mean error sd:", mean(object$sd_resid), '\n\n')
 
 }
-
-

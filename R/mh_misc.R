@@ -37,3 +37,13 @@ get_alpha0 <- function(n_ridge_prop, n_quant_prop, n_ridge_max){
 
   return(alpha0)
 }
+
+myTimestamp <- function(start_time = NULL){
+  if(is.null(start_time)){
+    x <- Sys.time()
+    return(paste('--', format(x, "%b %d %X"), '--'))
+  }else{
+    x <- Sys.time() - start_time
+    return(paste('--', format(round(x, 2)), '--'))
+  }
+}
