@@ -42,6 +42,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_keep <- n_post/n_thin
   idx <- c(rep(1, n_burn), rep(1:n_keep, each = n_thin))
 
+  X.unst <- X
+
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
@@ -155,12 +157,14 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     phase <- 'post'
   }
   if(print_every > 0){
+    cat('MCMC Start',myTimestamp(),'n ridge: 0','\n')
     silent <- FALSE
     cat(paste0('it = 1/', n_draws, ' (', phase, ') \n'))
   }else{
     print_every <- n_draws + 2
     silent <- TRUE
   }
+
 
   # Run MCMC
   for(it in 2:n_draws){
@@ -378,6 +382,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                                    rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
 
     sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
+
+    #browser()
+    if(it %% print_every == 0){
+      pr<-c('MCMC iteration',it,myTimestamp(),'n ridge:',n_ridge[idx[it]])
+      cat(pr,'\n')
+    }
+
   }
 
   if(!silent){
@@ -389,7 +400,11 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                  coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
                  w_n_act = w_n_act, w_feat = w_feat,
                  mn_X = mn_X, sd_X = sd_X,
-                 df_spline = df_spline, n_ridge_mean = n_ridge_mean,
-                 n_keep = n_keep, model = model),
+                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model, X=X.unst, y=y, call=match.call()),
             class = 'bppr')
+}
+
+myTimestamp<-function(){
+  x<-Sys.time()
+  paste('#--',format(x,"%b %d %X"),'--#')
 }
