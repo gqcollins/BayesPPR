@@ -16,7 +16,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-predict.bppr <- function(object, newdata, idx_use = NULL,...){
+predict.bppr <- function(object, newdata, idx_use = NULL, ...){
   newdata <- as.matrix(newdata)
   n <- nrow(newdata)
   p <- ncol(newdata)
@@ -33,16 +33,14 @@ predict.bppr <- function(object, newdata, idx_use = NULL,...){
   feat <- object$feat
   knots <- object$knots
   df_spline <- object$df_spline
+  n_keep <- object$n_keep
 
-  n_keep <- length(proj_dir)
   if(is.null(idx_use)){
     idx_use <- 1:n_keep
-    n_use <- n_keep
   }else if(max(idx_use) > n_keep){
     stop("invalid 'idx_use'")
-  }else{
-    n_use <- length(idx_use)
   }
+  n_use <- length(idx_use)
 
   preds <- matrix(0, nrow = n_use, ncol = n)
   for(i in 1:n_use){

@@ -2,9 +2,11 @@
 
 S3method(plot,bppr)
 S3method(predict,bppr)
+S3method(predict,bppr_pca)
 S3method(print,bppr)
 S3method(summary,bppr)
 export(bppr)
+export(bppr_pca)
 import(graphics)
 import(stats)
 import(utils)

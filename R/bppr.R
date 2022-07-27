@@ -24,7 +24,7 @@
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
 #' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
-#' @return An object of class 'bppr'. Predictions can be obtained by passing the entire object to the predict.bppr function.
+#' @return An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
 #' @keywords nonparametric projection pursuit regression splines
 #' @seealso \link{predict.bppr} for prediction.
 #' @export
@@ -32,7 +32,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = 0.5, rate_var_coefs = length(y)/2, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
@@ -81,6 +81,14 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   if(is.null(n_act_max)){
     n_cat <- sum(feat_type == 'cat')
     n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
+  }
+
+  if(is.null(shape_var_coefs)){
+    shape_var_coefs <- 0.5
+  }
+
+  if(is.null(rate_var_coefs)){
+    rate_var_coefs <- n/2
   }
 
   if(is.null(scale_proj_dir_prop)){
@@ -149,19 +157,21 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     phase <- 'post'
   }
   if(print_every > 0){
-    #print(paste0('it = 1/', n_draws, ' (', phase, ')'))
     cat('MCMC Start',myTimestamp(),'n ridge: 0','\n')
+    silent <- FALSE
+    cat(paste0('it = 1/', n_draws, ' (', phase, ') \n'))
   }else{
     print_every <- n_draws + 2
+    silent <- TRUE
   }
 
 
   # Run MCMC
   for(it in 2:n_draws){
     if(it == n_burn + 1) phase <- 'post'
-    #if((it - 1) %% print_every == 0  ||  it == n_burn + 1){
-    #  print(paste0('it = ', it, '/', n_draws, ' (', phase, ')'))
-    #}
+    if((it - 1) %% print_every == 0  ||  (it == n_burn + 1  &&  !silent)){
+      cat(paste0('it = ', it, '/', n_draws, ' (', phase, ') \n'))
+    }
 
     # Set current it values to last it values (these will change during the iteration)
     sd_resid[idx[it]] <- sd_resid[idx[it - 1]]
@@ -381,9 +391,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
   }
 
-
-
-  #print('done')
+  if(!silent){
+    cat('done \n')
+  }
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,
                  proj_dir = proj_dir, bias = bias, knots = knots,
