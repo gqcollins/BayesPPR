@@ -42,6 +42,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_keep <- n_post/n_thin
   idx <- c(rep(1, n_burn), rep(1:n_keep, each = n_thin))
 
+  X.unst <- X
+
   # Pre-processing
   n <- length(y)
   p <- ncol(X)
@@ -147,17 +149,19 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     phase <- 'post'
   }
   if(print_every > 0){
-    print(paste0('it = 1/', n_draws, ' (', phase, ')'))
+    #print(paste0('it = 1/', n_draws, ' (', phase, ')'))
+    cat('MCMC Start',myTimestamp(),'n ridge: 0','\n')
   }else{
     print_every <- n_draws + 2
   }
 
+
   # Run MCMC
   for(it in 2:n_draws){
     if(it == n_burn + 1) phase <- 'post'
-    if((it - 1) %% print_every == 0  ||  it == n_burn + 1){
-      print(paste0('it = ', it, '/', n_draws, ' (', phase, ')'))
-    }
+    #if((it - 1) %% print_every == 0  ||  it == n_burn + 1){
+    #  print(paste0('it = ', it, '/', n_draws, ' (', phase, ')'))
+    #}
 
     # Set current it values to last it values (these will change during the iteration)
     sd_resid[idx[it]] <- sd_resid[idx[it - 1]]
@@ -368,15 +372,29 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                                    rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
 
     sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
+
+    #browser()
+    if(it %% print_every == 0){
+      pr<-c('MCMC iteration',it,myTimestamp(),'n ridge:',n_ridge[idx[it]])
+      cat(pr,'\n')
+    }
+
   }
 
-  print('done')
+
+
+  #print('done')
 
   structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,
                  proj_dir = proj_dir, bias = bias, knots = knots,
                  coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
                  w_n_act = w_n_act, w_feat = w_feat,
                  mn_X = mn_X, sd_X = sd_X,
-                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model),
+                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model, X=X.unst, y=y, call=match.call()),
             class = 'bppr')
+}
+
+myTimestamp<-function(){
+  x<-Sys.time()
+  paste('#--',format(x,"%b %d %X"),'--#')
 }
