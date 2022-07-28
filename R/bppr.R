@@ -20,7 +20,8 @@
 #' @param w_n_act_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
 #' @param w_feat_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
-#' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
+#' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.
+#' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time
 #' @param n_thin keep every n_thin posterior draws after burn-in.
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
 #' @param model "bppr" is the only valid option as of now.
@@ -33,15 +34,20 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = 1000, model = 'bppr'){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
   }
   n_post <- n_post - n_post %% n_thin
-  n_draws <- n_burn + n_post
   n_keep <- n_post/n_thin
-  idx <- c(rep(1, n_burn), rep(1:n_keep, each = n_thin))
+  n_pre <- n_adapt + n_burn
+  n_draws <- n_pre + n_post
+  idx <- c(rep(1, n_pre), rep(1:n_keep, each = n_thin))
+  if(prior_coefs == 'flat'){
+    n_adapt <- n_pre
+    n_burn <- 0
+  }
 
   # Pre-processing
   n <- length(y)
@@ -124,7 +130,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       rate_var_coefs <- n/2
     }
     var_coefs <- numeric(n_keep)
-    var_coefs[1] <- 1/rgamma(1, shape_var_coefs, rate_var_coefs)
+    var_coefs[1] <- rate_var_coefs / shape_var_coefs
     c_var_coefs <- var_coefs[1] / (var_coefs[1] + 1)
   }else if(prior_coefs == 'flat'){
     c_var_coefs <- 1
@@ -152,14 +158,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_quant <- 0
   basis_mat <- matrix(rep(1, n)) # Current basis matrix
   qf_info <- get_qf_info(basis_mat, y)
-  qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+  if(n_adapt == 0) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
   basis_idx <- list(1) # Current indices of segments of basis functions
 
   ssy <- c(t(y) %*% y) # Keep track of overall sse
   sse <- ssy - c_var_coefs * qf_info$qf
   log_mh_bd <- 0
 
-  if(n_burn > 0){
+  if(n_adapt > 0){
+    phase <- 'adapt'
+  }else if(n_burn > 0){
     phase <- 'burn'
   }else{
     phase <- 'post-burn'
@@ -176,8 +184,15 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
   # Run MCMC
   for(it in 2:n_draws){
-    if(it == n_burn + 1) phase <- 'post-burn'
-    if((it - 1) %% print_every == 0  ||  (it == n_burn + 1  &&  !silent)){
+    if(it == n_adapt + 1){
+      if(n_burn > 0){
+        phase <- 'burn'
+      }else{
+        phase <- 'post-burn'
+      }
+    }
+    if(it == n_pre + 1) phase <- 'post-burn'
+    if((it - 1) %% print_every == 0  ||  ((it == n_adapt + 1  ||  it == n_pre + 1)  &&  !silent)){
       pr <- paste0('MCMC iteration ', it, '/', n_draws, ' (', phase, ') ',
                    myTimestamp(start_time), ' n ridge: ', n_ridge[idx[it]])
       cat(pr, '\n')
@@ -278,7 +293,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           w_feat[feat_prop] <- w_feat[feat_prop] + 1
 
           qf_info <- qf_info_prop
-          qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+          if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
           sse <- sse_prop
           log_mh_bd <- log_mh_bd_prop
         }
@@ -349,7 +364,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           w_n_act[n_act_prop] <- w_n_act[n_act_prop] - 1
 
           qf_info <- qf_info_prop
-          qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+          if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
           sse <- sse_prop
           log_mh_bd <- log_mh_bd_prop
         }
@@ -395,26 +410,32 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           basis_mat <- basis_mat_prop
 
           qf_info <- qf_info_prop
-          qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+          if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
           sse <- sse_prop
         }
       }
     }
 
-    # Draw coefs
-    coefs[[idx[it]]] <- c_var_coefs * qf_info$ls_est +
-      sqrt(c_var_coefs) * sd_resid[idx[it]] * qf_info$inv_chol %*% rnorm(n_basis_total) # Draw coefs
-    preds <- basis_mat %*% coefs[[idx[it]]] # Current predictions of y
-    resid <- y - preds # current residuals
+    if(it > n_adapt){
+      if(it == n_adapt + 1  &&  is.null(qf_info$inv_chol)){
+        qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+      }
 
-    sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
+      # Draw coefs
+      coefs[[idx[it]]] <- c_var_coefs * qf_info$ls_est +
+        sqrt(c_var_coefs) * sd_resid[idx[it]] * qf_info$inv_chol %*% rnorm(n_basis_total) # Draw coefs
+      preds <- basis_mat %*% coefs[[idx[it]]] # Current predictions of y
+      resid <- y - preds # current residuals
 
-    if(prior_coefs == 'zs'){
-      var_coefs[idx[it]] <- 1/rgamma(1,
-                                     shape_var_coefs + n_basis_total/2,
-                                     rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
-      c_var_coefs <- var_coefs[idx[it]] / (var_coefs[idx[it]] + 1)
-      sse <- ssy - c_var_coefs * qf_info$qf
+      sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
+
+      if(prior_coefs == 'zs'){
+        var_coefs[idx[it]] <- 1/rgamma(1,
+                                       shape_var_coefs + n_basis_total/2,
+                                       rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
+        c_var_coefs <- var_coefs[idx[it]] / (var_coefs[idx[it]] + 1)
+        sse <- ssy - c_var_coefs * qf_info$qf
+      }
     }
   }
 
