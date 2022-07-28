@@ -97,7 +97,6 @@ Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x
   ## get out-of-sample predictions
   X_test <- matrix(runif(n*p), n, p)
   preds <- predict(fit, X_test) # posterior predictive samples
-
 }
 
 ## minimal example for CRAN testing

@@ -18,7 +18,7 @@ get_move_type <- function(n_ridge, n_quant, n_ridge_max){
   return(move_type)
 }
 
-get_alpha0 <- function(n_ridge_prop, n_quant_prop, n_ridge_max){
+get_log_mh_bd <- function(n_ridge_prop, n_quant_prop, n_ridge_max){
   if(n_ridge_prop == 0){
     alpha0 <- 0
   }else if(n_ridge_prop == n_ridge_max){

@@ -20,7 +20,6 @@
   ## get out-of-sample predictions
   X_test <- matrix(runif(n*p), n, p)
   preds <- predict(fit, X_test) # posterior predictive samples
-
 }
 
 ## minimal example for CRAN testing

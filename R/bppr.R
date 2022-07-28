@@ -147,6 +147,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_basis_ridge <- 1 # Number of basis functions in each ridge function
   n_basis_total <- sum(n_basis_ridge)
 
+  ridge_type <- character()
+  j_quant <- integer()
+  n_quant <- 0
   basis_mat <- matrix(rep(1, n)) # Current basis matrix
   qf_info <- get_qf_info(basis_mat, y)
   qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
@@ -154,6 +157,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
   ssy <- c(t(y) %*% y) # Keep track of overall sse
   sse <- ssy - c_var_coefs * qf_info$qf
+  log_mh_bd <- 0
 
   if(n_burn > 0){
     phase <- 'burn'
@@ -170,7 +174,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     silent <- TRUE
   }
 
-
   # Run MCMC
   for(it in 2:n_draws){
     if(it == n_burn + 1) phase <- 'post-burn'
@@ -181,48 +184,38 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
 
     # Set current it values to last it values (these will change during the iteration)
-    if(prior_coefs == 'zs') var_coefs[idx[it]] <- var_coefs[idx[it - 1]]
-    sd_resid[idx[it]] <- sd_resid[idx[it - 1]]
-    coefs[[idx[it]]] <- coefs[[idx[it - 1]]]
-    n_ridge[idx[it]] <- n_ridge[idx[it - 1]]
-    n_act[[idx[it]]] <- n_act[[idx[it - 1]]]
-    feat[[idx[it]]] <- feat[[idx[it - 1]]]
-    knots[[idx[it]]] <- knots[[idx[it - 1]]]
-    proj_dir[[idx[it]]] <- proj_dir[[idx[it - 1]]]
-
-    # Perform Reversible Jump Step (birth, death, change)
-    if(n_ridge[idx[it]] == 0){
-      move_type <- 'birth'
-      alpha0 <- log(1/3)
-    }else if(n_ridge[idx[it]] == n_ridge_max){
-      move_type <- sample(c('death', 'change'), 1)
-      alpha0 <- log(2/3)
-    }else{
-      move_type <- sample(c('birth', 'death', 'change'), 1)
-      if(n_ridge[idx[it]] == 1  &&  move_type == 'death'){
-        alpha0 <- log(3)
-      }else if(n_ridge[idx[it]] == (n_ridge_max - 1)  &&  move_type == 'birth'){
-        alpha0 <- log(3/2)
-      }else{
-        alpha0 <- 0
-      }
+    if(idx[it] > idx[it - 1]){
+      if(prior_coefs == 'zs') var_coefs[idx[it]] <- var_coefs[idx[it - 1]]
+      sd_resid[idx[it]] <- sd_resid[idx[it - 1]]
+      coefs[[idx[it]]] <- coefs[[idx[it - 1]]]
+      n_ridge[idx[it]] <- n_ridge[idx[it - 1]]
+      n_act[[idx[it]]] <- n_act[[idx[it - 1]]]
+      feat[[idx[it]]] <- feat[[idx[it - 1]]]
+      knots[[idx[it]]] <- knots[[idx[it - 1]]]
+      proj_dir[[idx[it]]] <- proj_dir[[idx[it - 1]]]
     }
 
+    move_type <- get_move_type(n_ridge[idx[it]], n_quant, n_ridge_max)
+
     if(move_type == 'birth'){ # Birth step
+      n_ridge_prop <- n_ridge[idx[it]] + 1
       n_act_prop <- sample(n_act_max, 1, prob = w_n_act) # Propose number of active features
-      alpha0 <- alpha0 - (log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
+      log_mh_nkd <- -(log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
       if(n_act_prop == 1){
         feat_prop <- sample(p, 1)
       }else{
         feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
-        alpha0 <- alpha0 - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
+        log_mh_nkd <- log_mh_nkd - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
       }
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
+        ridge_type_prop <- 'cat'
+        n_quant_prop <- n_quant
         proj_dir_prop <- knots_prop <- NA
         ridge_basis_prop <- get_cat_basis(X_st[, feat_prop, drop = FALSE])
         n_basis_prop <- 1
       }else{
+        n_quant_prop <- n_quant + 1
         if(n_act_prop == 1){
           proj_dir_prop <- matrix(sample(c(-1, 1), 1))
         }else{
@@ -231,6 +224,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         proj_prop <- X_st[, feat_prop, drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(any(feat_type[feat_prop] == 'cont')){ # Are any proposed features continuous?
+          ridge_type_prop <- 'cont'
           max_knot0 <- quantile(proj_prop, p_dat_max)
           rg_knot0 <- (max_knot0 - min(proj_prop)) / prob_relu
           knot0_prop <- max_knot0 - rg_knot0 * runif(1)
@@ -238,6 +232,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           ridge_basis_prop <- get_mns_basis(proj_prop, knots_prop) # Get proposed basis functions
           n_basis_prop <- df_spline
         }else{ # The proposed features are a mix of categorical and discrete quantitative
+          ridge_type_prop <- 'disc'
           knots_prop <- NA
           ridge_basis_prop <- proj_prop
           n_basis_prop <- 1
@@ -246,24 +241,31 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
       basis_mat_prop <- cbind(basis_mat, ridge_basis_prop)
       qf_info_prop <- get_qf_info(basis_mat_prop, y)
+      log_mh_bd_prop <- get_log_mh_bd(n_ridge_prop, n_quant_prop, n_ridge_max)
 
       if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
         # Compute the acceptance probability
-        alpha <- alpha0 + # Adjustment for probability of birth proposal
+        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_nkd + # Adjustment for probability of birth proposal
           -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge_mean/(n_ridge[idx[it]] + 1)) # Prior and proposal distribution
         if(prior_coefs == 'zs'){
-          alpha <- alpha - n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
+          log_mh <- log_mh - n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
         }else{
-          alpha <- alpha + log(10e-6) # The rest of the marginal likelihood for flat prior
+          log_mh <- log_mh + log(10e-6) # The rest of the marginal likelihood for flat prior
         }
 
-        if(log(runif(1)) < alpha){ # Accept the proposal
+        if(log(runif(1)) < log_mh){ # Accept the proposal
           n_ridge[idx[it]] <- j_birth <- n_ridge[idx[it]] + 1
           n_act[[idx[it]]][j_birth] <- n_act_prop
           feat[[idx[it]]][[j_birth]] <- feat_prop
           knots[[idx[it]]][[j_birth]] <- knots_prop
           proj_dir[[idx[it]]][[j_birth]] <- proj_dir_prop
+
+          if(ridge_type_prop != 'cat'){
+            j_quant <- c(j_quant, j_birth)
+            n_quant <- n_quant_prop
+          }
+          ridge_type[j_birth] <- ridge_type_prop
 
           basis_idx_start <- basis_idx[[j_birth]][n_basis_ridge[j_birth]]
           basis_idx[[j_birth + 1]] <- (basis_idx_start + 1):(basis_idx_start + n_basis_prop)
@@ -278,43 +280,59 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           qf_info <- qf_info_prop
           qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
           sse <- sse_prop
+          log_mh_bd <- log_mh_bd_prop
         }
       }
     }else if(move_type == 'death'){ # Death step
       j_death <- sample(n_ridge[idx[it]], 1) # Choose random index to delete
 
       n_act_prop <- n_act[[idx[it]]][j_death]
-      alpha0 <- alpha0 + log(n_act_max) + log((w_n_act[n_act_prop] - 1)/(sum(w_n_act) - 1))
+      log_mh_nkd <- log(n_act_max) + log((w_n_act[n_act_prop] - 1)/(sum(w_n_act) - 1))
 
       feat_prop <- feat[[idx[it]]][[j_death]]
       w_feat_prop <- w_feat;
       w_feat_prop[feat_prop] <- w_feat_prop[feat_prop] - 1
       if(n_act_prop > 1){
-        alpha0 <- alpha0 + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
+        log_mh_nkd <- log_mh_nkd + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
       }
 
       basis_mat_prop <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
       qf_info_prop <- get_qf_info(basis_mat_prop, y)
+      n_ridge_prop <- n_ridge[idx[it]] - 1
+      if(ridge_type[j_death] == 'cat'){
+        n_quant_prop <- n_quant
+      }else{
+        n_quant_prop <- n_quant - 1
+      }
+      log_mh_bd_prop <- get_log_mh_bd(n_ridge_prop, n_quant_prop, n_ridge_max)
 
       if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
         n_basis_prop <- n_basis_ridge[j_death + 1]
 
         # Compute acceptance probability
-        alpha <- alpha0 + # Adjustment for probability of death proposal
+        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_nkd + # Adjustment for probability of death proposal
           -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge[idx[it]]/n_ridge_mean) # Prior and proposal distribution
         if(prior_coefs == 'zs'){
-          alpha <- alpha + n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
+          log_mh <- log_mh + n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
         }else{
-          alpha <- alpha - log(10e-6) # The rest of the marginal likelihood for flat prior
+          log_mh <- log_mh - log(10e-6) # The rest of the marginal likelihood for flat prior
         }
 
-        if(log(runif(1)) < alpha){ # Accept the proposal
+        if(log(runif(1)) < log_mh){ # Accept the proposal
           if(j_death < n_ridge[idx[it]]){
             for(j in (j_death + 1):n_ridge[idx[it]]){
               basis_idx[[j + 1]] <- basis_idx[[j + 1]] - n_basis_ridge[j_death + 1]
             }
           }
+
+          if(ridge_type[j_death] != 'cat'){
+            n_quant <- n_quant - 1
+            j_quant <- j_quant[j_quant != j_death]
+          }
+          j_quant[j_quant > j_death] <- j_quant[j_quant > j_death] - 1
+          ridge_type <- ridge_type[-j_death]
+
           basis_idx <- basis_idx[-(j_death + 1)]
           n_basis_ridge <- n_basis_ridge[-(j_death + 1)]
           n_basis_total <- n_basis_total - n_basis_prop
@@ -333,47 +351,52 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           qf_info <- qf_info_prop
           qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
           sse <- sse_prop
+          log_mh_bd <- log_mh_bd_prop
         }
       }
     }else{ # Change Step
-      j_change <- sample(n_ridge[idx[it]], 1) # Which ridge function should we change?
-      if(!is.na(proj_dir[[idx[it]]][[j_change]][1])){ # Are any variables quantitative for this ridge function?
-        if(n_act[[idx[it]]][j_change] == 1){
-          proj_dir_prop <- matrix(sample(c(-1, 1), 1))
-        }else{
-          proj_dir_prop <- rps(proj_dir[[idx[it]]][[j_change]], proj_dir_prop_prec) # Get proposed direction
-        }
-        proj_prop <- X_st[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
+      if(n_quant  == 1){
+        j_change <- j_quant
+      }else{
+        j_change <- sample(j_quant, 1) # Which ridge function should we change?
+      }
 
-        if(!is.na(knots[[idx[it]]][[j_change]][1])){ # Are any variables continuous for this ridge function?
-          max_knot0 <- quantile(proj_prop, p_dat_max)
-          rg_knot0 <- (max_knot0 -  min(proj_prop)) / prob_relu
-          knot0_prop <- max_knot0 - rg_knot0 * runif(1)
-          knots_prop <- c(knot0_prop, quantile(proj_prop[proj_prop > knot0_prop], knot_quants)) # Get proposed knots
-          ridge_basis_prop <- get_mns_basis(proj_prop, knots_prop) # Get proposed basis function
-        }else{
-          knots_prop <- NA
-          ridge_basis_prop <- proj_prop
-        }
+      if(n_act[[idx[it]]][j_change] == 1){
+        proj_dir_prop <- matrix(sample(c(-1, 1), 1))
+      }else{
+        proj_dir_prop <- rps(proj_dir[[idx[it]]][[j_change]], proj_dir_prop_prec) # Get proposed direction
+      }
 
-        basis_mat_prop <- basis_mat
-        basis_mat_prop[, basis_idx[[j_change + 1]]] <- ridge_basis_prop
-        qf_info_prop <- get_qf_info(basis_mat_prop, y)
+      proj_prop <- X_st[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
-        if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
-          # Compute the acceptance probability
-          alpha <- -n/2 * (log(sse_prop) - log(sse)) # Marginal Likelihood
+      if(ridge_type[j_change] == 'cont'){ # Are any variables continuous for this ridge function?
+        max_knot0 <- quantile(proj_prop, p_dat_max)
+        rg_knot0 <- (max_knot0 -  min(proj_prop)) / prob_relu
+        knot0_prop <- max_knot0 - rg_knot0 * runif(1)
+        knots_prop <- c(knot0_prop, quantile(proj_prop[proj_prop > knot0_prop], knot_quants)) # Get proposed knots
+        ridge_basis_prop <- get_mns_basis(proj_prop, knots_prop) # Get proposed basis function
+      }else{
+        knots_prop <- NA
+        ridge_basis_prop <- proj_prop
+      }
 
-          if(log(runif(1)) < alpha){ # Accept the proposal
-            knots[[idx[it]]][[j_change]] <- knots_prop
-            proj_dir[[idx[it]]][[j_change]] <- proj_dir_prop
+      basis_mat_prop <- basis_mat
+      basis_mat_prop[, basis_idx[[j_change + 1]]] <- ridge_basis_prop
+      qf_info_prop <- get_qf_info(basis_mat_prop, y)
 
-            basis_mat <- basis_mat_prop
+      if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
+        # Compute the acceptance probability
+        log_mh <- -n/2 * (log(sse_prop) - log(sse)) # Marginal Likelihood
 
-            qf_info <- qf_info_prop
-            qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
-            sse <- sse_prop
-          }
+        if(log(runif(1)) < log_mh){ # Accept the proposal
+          knots[[idx[it]]][[j_change]] <- knots_prop
+          proj_dir[[idx[it]]][[j_change]] <- proj_dir_prop
+
+          basis_mat <- basis_mat_prop
+
+          qf_info <- qf_info_prop
+          qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
+          sse <- sse_prop
         }
       }
     }
