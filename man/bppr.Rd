@@ -12,6 +12,7 @@ bppr(
   n_act_max = NULL,
   df_spline = 4,
   prob_relu = 2/3,
+  prior_coefs = "zs",
   shape_var_coefs = NULL,
   rate_var_coefs = NULL,
   n_dat_min = NULL,
@@ -40,9 +41,11 @@ bppr(
 
 \item{prob_relu}{prior probability that any given ridge function uses a relu transformation.}
 
-\item{shape_var_coefs}{shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
+\item{prior_coefs}{form of the prior distribution for the basis coefficients. Default is \code{"zs"} for the Zellner-Siow prior. The other option is \code{"flat"}, which is an improper prior.}
 
-\item{rate_var_coefs}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.}
+\item{shape_var_coefs}{shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.}
+
+\item{rate_var_coefs}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.}
 
 \item{n_dat_min}{minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
 
@@ -88,12 +91,13 @@ Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x
   ## fit BPPR
   fit <- bppr(X, y)
 
-  ## prediction
+  ## plot diagnostics
+  plot(fit)
+
+  ## get out-of-sample predictions
   X_test <- matrix(runif(n*p), n, p)
   preds <- predict(fit, X_test) # posterior predictive samples
-  true_f <- f(X_test)
-  plot(true_f, colMeans(preds), xlab = 'True Value', ylab = 'Posterior Predictive Mean')
-  abline(a = 0, b = 1, col = 2)
+
 }
 
 ## minimal example for CRAN testing

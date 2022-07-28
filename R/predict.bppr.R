@@ -26,7 +26,6 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
     newdata[, j] <- (newdata[, j] - mn_X[j]) / sd_X[j]
   }
   coefs <- object$coefs
-  bias <- object$bias
   proj_dir <- object$proj_dir
   n_ridge <- object$n_ridge
   n_act <- object$n_act
@@ -57,8 +56,8 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
           basis_idx <- basis_idx_start
           basis_idx_start <- basis_idx_start + 1
         }else{ # At least one continuous variable in this basis
-          proj <- relu(bias[[idx_use[i]]][j] + newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]) # Get relu of projection
-          ridge_basis <- get_ns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
+          proj <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
+          ridge_basis <- get_mns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
           basis_idx <- basis_idx_start:(basis_idx_start + df_spline - 1)
           basis_idx_start <- basis_idx_start + df_spline
         }

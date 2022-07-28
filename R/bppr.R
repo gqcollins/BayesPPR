@@ -86,7 +86,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   if(is.null(scale_proj_dir_prop)){
     proj_dir_prop_prec <- 1000 # scale_proj_dir_prop = 0.002
   }else if(scale_proj_dir_prop > 1  ||  scale_proj_dir_prop <= 0){
-    stop("scale prop must be in (0, 1]")
+    stop("scale_proj_dir_prop must be in (0, 1]")
   }else{
     proj_dir_prop_prec <- 1/scale_proj_dir_prop
     proj_dir_prop_prec <- (proj_dir_prop_prec - 1) + sqrt(proj_dir_prop_prec * (proj_dir_prop_prec - 1))
@@ -113,7 +113,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     stop('n_ridge_max <= 0. If n_ridge_max was set by default, df_spline is too large compared to the sample size.')
   }
 
-  knot_quants <- seq(0, 1, length.out = df_spline + 1) # Quantiles for knot locations
+  knot_quants <- seq(0, 1, length.out = df_spline + 1) # Quantiles for knot locations (except initial knot)
 
   # Initialization
   if(prior_coefs == 'zs'){
@@ -142,7 +142,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n_act <- lapply(1:n_keep, function(it) numeric()) # Number of active features for jth ridge function
   feat <- lapply(1:n_keep, function(it) list()) # Features being used in jth ridge function
   knots <- lapply(1:n_keep, function(it) list()) # Location of knots for nsplines
-  bias <- lapply(1:n_keep, function(it) numeric()) # Bias term for each ridge function
   proj_dir <- lapply(1:n_keep, function(it) list()) # Ridge directions
   proj_dir_mn <- lapply(1:n_act_max, function(a) rep(1/sqrt(a), a)) # prior mean for proj_dir (arbitrary, since precision is zero)
   n_basis_ridge <- 1 # Number of basis functions in each ridge function
@@ -189,7 +188,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     n_act[[idx[it]]] <- n_act[[idx[it - 1]]]
     feat[[idx[it]]] <- feat[[idx[it - 1]]]
     knots[[idx[it]]] <- knots[[idx[it - 1]]]
-    bias[[idx[it]]] <- bias[[idx[it - 1]]]
     proj_dir[[idx[it]]] <- proj_dir[[idx[it - 1]]]
 
     # Perform Reversible Jump Step (birth, death, change)
@@ -221,7 +219,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       }
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
-        proj_dir_prop <- bias_prop <- knots_prop <- NA
+        proj_dir_prop <- knots_prop <- NA
         ridge_basis_prop <- get_cat_basis(X_st[, feat_prop, drop = FALSE])
         n_basis_prop <- 1
       }else{
@@ -233,16 +231,14 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         proj_prop <- X_st[, feat_prop, drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(any(feat_type[feat_prop] == 'cont')){ # Are any proposed features continuous?
-          min_proj <- min(proj_prop)
-          min_bias <- -quantile(proj_prop, p_dat_max)
-          rg_bias <- (-min_proj - min_bias) / prob_relu
-          bias_prop <- rg_bias * runif(1) + min_bias
-          proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
-          knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
-          ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis functions
+          max_knot0 <- quantile(proj_prop, p_dat_max)
+          rg_knot0 <- (max_knot0 - min(proj_prop)) / prob_relu
+          knot0_prop <- max_knot0 - rg_knot0 * runif(1)
+          knots_prop <- c(knot0_prop, quantile(proj_prop[proj_prop > knot0_prop], knot_quants)) # Get proposed knots
+          ridge_basis_prop <- get_mns_basis(proj_prop, knots_prop) # Get proposed basis functions
           n_basis_prop <- df_spline
         }else{ # The proposed features are a mix of categorical and discrete quantitative
-          bias_prop <- knots_prop <- NA
+          knots_prop <- NA
           ridge_basis_prop <- proj_prop
           n_basis_prop <- 1
         }
@@ -267,7 +263,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           n_act[[idx[it]]][j_birth] <- n_act_prop
           feat[[idx[it]]][[j_birth]] <- feat_prop
           knots[[idx[it]]][[j_birth]] <- knots_prop
-          bias[[idx[it]]][j_birth] <- bias_prop
           proj_dir[[idx[it]]][[j_birth]] <- proj_dir_prop
 
           basis_idx_start <- basis_idx[[j_birth]][n_basis_ridge[j_birth]]
@@ -327,7 +322,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           n_act[[idx[it]]] <- n_act[[idx[it]]][-j_death]
           feat[[idx[it]]] <- feat[[idx[it]]][-j_death]
           knots[[idx[it]]] <- knots[[idx[it]]][-j_death]
-          bias[[idx[it]]] <- bias[[idx[it]]][-j_death]
           proj_dir[[idx[it]]] <- proj_dir[[idx[it]]][-j_death]
 
           basis_mat <- basis_mat_prop
@@ -352,15 +346,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         proj_prop <- X_st[, feat[[idx[it]]][[j_change]], drop = FALSE] %*% proj_dir_prop # Get proposed projection
 
         if(!is.na(knots[[idx[it]]][[j_change]][1])){ # Are any variables continuous for this ridge function?
-          min_proj <- min(proj_prop)
-          min_bias <- -quantile(proj_prop, p_dat_max)
-          rg_bias <- (-min_proj - min_bias) / prob_relu
-          bias_prop <- rg_bias * runif(1) + min_bias
-          proj_prop_trans <- relu(bias_prop + proj_prop) # Get transformation of projection
-          knots_prop <- quantile(proj_prop_trans[proj_prop_trans > 0], knot_quants) # Get proposed knots
-          ridge_basis_prop <- get_ns_basis(proj_prop_trans, knots_prop) # Get proposed basis function
+          max_knot0 <- quantile(proj_prop, p_dat_max)
+          rg_knot0 <- (max_knot0 -  min(proj_prop)) / prob_relu
+          knot0_prop <- max_knot0 - rg_knot0 * runif(1)
+          knots_prop <- c(knot0_prop, quantile(proj_prop[proj_prop > knot0_prop], knot_quants)) # Get proposed knots
+          ridge_basis_prop <- get_mns_basis(proj_prop, knots_prop) # Get proposed basis function
         }else{
-          bias_prop <- knots_prop <- NA
+          knots_prop <- NA
           ridge_basis_prop <- proj_prop
         }
 
@@ -374,7 +366,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
           if(log(runif(1)) < alpha){ # Accept the proposal
             knots[[idx[it]]][[j_change]] <- knots_prop
-            bias[[idx[it]]][j_change] <- bias_prop
             proj_dir[[idx[it]]][[j_change]] <- proj_dir_prop
 
             basis_mat <- basis_mat_prop
@@ -404,8 +395,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
   }
 
-  out <- list(n_keep = n_keep, n_ridge = n_ridge, n_act = n_act, feat = feat,
-              proj_dir = proj_dir, bias = bias, knots = knots,
+  out <- list(n_keep = n_keep, n_ridge = n_ridge,
+              n_act = n_act, feat = feat,
+              proj_dir = proj_dir, knots = knots,
               coefs = coefs, sd_resid = sd_resid,
               w_n_act = w_n_act, w_feat = w_feat,
               mn_X = mn_X, sd_X = sd_X,

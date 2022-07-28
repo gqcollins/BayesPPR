@@ -2,20 +2,20 @@ relu <- function(x){ # Get relu of input
   (abs(x) + x) / 2
 }
 
-get_ns_basis <- function(u, knots){ # Get natural spline basis
+get_mns_basis <- function(u, knots){ # Get modified natural spline basis
   n_knots <- length(knots)
-  df <- n_knots - 1
+  df <- n_knots - 2
 
-  basis <- u # Initialize basis
+  basis <- relu(u - knots[1]) # Initialize basis -- would be basis <- u for ns
 
   if(df > 1){
-    n_internal_knots <- n_knots - 2
+    n_internal_knots <- n_knots - 3
     r <- d <- list() # Temporary lists for computing basis
-    for(k in 1:n_knots){
-      r[[k]] <- relu(u - knots[k])^3
+    for(k in 1:(n_knots - 1)){
+      r[[k]] <- relu(u - knots[k + 1])^3
     }
     for(k in 1:df){
-      d[[k]] <- (r[[k]] - r[[n_knots]]) / (knots[n_knots] - knots[k])
+      d[[k]] <- (r[[k]] - r[[n_knots - 1]]) / (knots[n_knots] - knots[k + 1])
     }
     for(k in 1:n_internal_knots){
       basis <- cbind(basis, d[[k]] - d[[df]])
