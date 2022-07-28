@@ -12,8 +12,9 @@
 #' @param n_act_max maximum number of active variables in any given ridge function. Defaults to 3 unless categorical features are detected, in which case the default is larger.
 #' @param df_spline degrees of freedom for spline basis. Stability should be examined for anything other than 4.
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
-#' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
-#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
+#' @param prior_coefs form of the prior distribution for the basis coefficients. Default is \code{"zs"} for the Zellner-Siow prior. The other option is \code{"flat"}, which is an improper prior.
+#' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.
+#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
 #' @param w_n_act_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
@@ -32,7 +33,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = 1000, model = 'bppr'){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
@@ -82,14 +83,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
   }
 
-  if(is.null(shape_var_coefs)){
-    shape_var_coefs <- 0.5
-  }
-
-  if(is.null(rate_var_coefs)){
-    rate_var_coefs <- n/2
-  }
-
   if(is.null(scale_proj_dir_prop)){
     proj_dir_prop_prec <- 1000 # scale_proj_dir_prop = 0.002
   }else if(scale_proj_dir_prop > 1  ||  scale_proj_dir_prop <= 0){
@@ -123,14 +116,27 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   knot_quants <- seq(0, 1, length.out = df_spline + 1) # Quantiles for knot locations
 
   # Initialization
+  if(prior_coefs == 'zs'){
+    if(is.null(shape_var_coefs)){
+      shape_var_coefs <- 0.5
+    }
+    if(is.null(rate_var_coefs)){
+      rate_var_coefs <- n/2
+    }
+    var_coefs <- numeric(n_keep)
+    var_coefs[1] <- 1/rgamma(1, shape_var_coefs, rate_var_coefs)
+    c_var_coefs <- var_coefs[1] / (var_coefs[1] + 1)
+  }else if(prior_coefs == 'flat'){
+    c_var_coefs <- 1
+  }else{
+    stop("prior_coefs must be either 'zs' or 'flat'")
+  }
+
   sd_resid <- numeric(n_keep) # Error standard deviation
   sd_resid[1] <- 1
 
-  coefs <- lapply(1:n_keep, function(it) numeric(1)) # Ridge coefficients
+  coefs <- lapply(1:n_keep, function(it) numeric(1)) # Basis coefficients
   coefs[[1]] <- mean(y)
-
-  var_coefs <- numeric(n_keep)
-  var_coefs[1] <- 1/rgamma(1, shape_var_coefs, rate_var_coefs)
 
   n_ridge <- numeric(n_keep) # Number of ridge functions
   n_act <- lapply(1:n_keep, function(it) numeric()) # Number of active features for jth ridge function
@@ -148,7 +154,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   basis_idx <- list(1) # Current indices of segments of basis functions
 
   ssy <- c(t(y) %*% y) # Keep track of overall sse
-  sse <- ssy - var_coefs[1]/(var_coefs[1] + 1) * qf_info$qf
+  sse <- ssy - c_var_coefs * qf_info$qf
 
   if(n_burn > 0){
     phase <- 'burn'
@@ -176,9 +182,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
 
     # Set current it values to last it values (these will change during the iteration)
+    if(prior_coefs == 'zs') var_coefs[idx[it]] <- var_coefs[idx[it - 1]]
     sd_resid[idx[it]] <- sd_resid[idx[it - 1]]
     coefs[[idx[it]]] <- coefs[[idx[it - 1]]]
-    var_coefs[idx[it]] <- var_coefs[idx[it - 1]]
     n_ridge[idx[it]] <- n_ridge[idx[it - 1]]
     n_act[[idx[it]]] <- n_act[[idx[it - 1]]]
     feat[[idx[it]]] <- feat[[idx[it - 1]]]
@@ -245,11 +251,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       basis_mat_prop <- cbind(basis_mat, ridge_basis_prop)
       qf_info_prop <- get_qf_info(basis_mat_prop, y)
 
-      if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info_prop$qf) > 0){
+      if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
         # Compute the acceptance probability
         alpha <- alpha0 + # Adjustment for probability of birth proposal
-          -n/2 * (log(sse_prop) - log(sse)) - n_basis_prop/2 * log(var_coefs[idx[it]] + 1) + # Marginal likelihood
+          -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge_mean/(n_ridge[idx[it]] + 1)) # Prior and proposal distribution
+        if(prior_coefs == 'zs'){
+          alpha <- alpha - n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
+        }else{
+          alpha <- alpha + log(10e-6) # The rest of the marginal likelihood for flat prior
+        }
 
         if(log(runif(1)) < alpha){ # Accept the proposal
           n_ridge[idx[it]] <- j_birth <- n_ridge[idx[it]] + 1
@@ -290,13 +301,18 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       basis_mat_prop <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
       qf_info_prop <- get_qf_info(basis_mat_prop, y)
 
-      if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info_prop$qf) > 0){
+      if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
         n_basis_prop <- n_basis_ridge[j_death + 1]
 
         # Compute acceptance probability
         alpha <- alpha0 + # Adjustment for probability of death proposal
-          -n/2 * (log(sse_prop) - log(sse)) + n_basis_prop/2 * log(var_coefs[idx[it]] + 1) + # Marginal likelihood
+          -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge[idx[it]]/n_ridge_mean) # Prior and proposal distribution
+        if(prior_coefs == 'zs'){
+          alpha <- alpha + n_basis_prop/2 * log(var_coefs[idx[it]] + 1) # The rest of the marginal likelihood for Zellner-Siow prior
+        }else{
+          alpha <- alpha - log(10e-6) # The rest of the marginal likelihood for flat prior
+        }
 
         if(log(runif(1)) < alpha){ # Accept the proposal
           if(j_death < n_ridge[idx[it]]){
@@ -352,7 +368,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         basis_mat_prop[, basis_idx[[j_change + 1]]] <- ridge_basis_prop
         qf_info_prop <- get_qf_info(basis_mat_prop, y)
 
-        if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info_prop$qf) > 0){
+        if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
           # Compute the acceptance probability
           alpha <- -n/2 * (log(sse_prop) - log(sse)) # Marginal Likelihood
 
@@ -372,18 +388,31 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
 
     # Draw coefs
-    coefs[[idx[it]]] <- var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$ls_est +
-      sqrt(var_coefs[idx[it]]/(var_coefs[idx[it]] + 1)) * sd_resid[idx[it]] * qf_info$inv_chol %*% rnorm(n_basis_total) # Draw coefs
+    coefs[[idx[it]]] <- c_var_coefs * qf_info$ls_est +
+      sqrt(c_var_coefs) * sd_resid[idx[it]] * qf_info$inv_chol %*% rnorm(n_basis_total) # Draw coefs
     preds <- basis_mat %*% coefs[[idx[it]]] # Current predictions of y
     resid <- y - preds # current residuals
 
     sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
 
-    var_coefs[idx[it]] <- 1/rgamma(1,
-                                   shape_var_coefs + n_basis_total/2,
-                                   rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
+    if(prior_coefs == 'zs'){
+      var_coefs[idx[it]] <- 1/rgamma(1,
+                                     shape_var_coefs + n_basis_total/2,
+                                     rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
+      c_var_coefs <- var_coefs[idx[it]] / (var_coefs[idx[it]] + 1)
+      sse <- ssy - c_var_coefs * qf_info$qf
+    }
+  }
 
-    sse <- ssy - var_coefs[idx[it]]/(var_coefs[idx[it]] + 1) * qf_info$qf
+  out <- list(n_keep = n_keep, n_ridge = n_ridge, n_act = n_act, feat = feat,
+              proj_dir = proj_dir, bias = bias, knots = knots,
+              coefs = coefs, sd_resid = sd_resid,
+              w_n_act = w_n_act, w_feat = w_feat,
+              mn_X = mn_X, sd_X = sd_X,
+              df_spline = df_spline,
+              X = X, y = y, call = match.call())
+  if(prior_coefs == 'zs'){
+    out$var_coefs <- var_coefs
   }
 
   if(!silent){
@@ -391,12 +420,5 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
                myTimestamp(start_time), ' n ridge: ', n_ridge[idx[it]], '\n'))
   }
 
-  structure(list(n_ridge = n_ridge, n_act = n_act, feat = feat,
-                 proj_dir = proj_dir, bias = bias, knots = knots,
-                 coefs = coefs, var_coefs = var_coefs, sd_resid = sd_resid,
-                 w_n_act = w_n_act, w_feat = w_feat,
-                 mn_X = mn_X, sd_X = sd_X,
-                 df_spline = df_spline, n_ridge_mean = n_ridge_mean, model = model,
-                 n_post = n_post, n_burn = n_burn, n_thin = n_thin, n_keep = n_keep, X = X, y = y, call = match.call()),
-            class = 'bppr')
+  structure(out, class = 'bppr')
 }
