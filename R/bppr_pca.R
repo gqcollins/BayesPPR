@@ -16,17 +16,19 @@
 #' @param n_act_max maximum number of active variables in any given ridge function. Defaults to 3 unless categorical features are detected, in which case the default is larger.
 #' @param df_spline degrees of freedom for spline basis. Stability should be examined for anything other than 4.
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
-#' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
-#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior.
+#' @param prior_coefs form of the prior distribution for the basis coefficients. Default is \code{"zs"} for the Zellner-Siow prior. The other option is \code{"flat"}, which is an improper prior.
+#' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.
+#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
-#' @param w_n_act_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
-#' @param w_feat_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
+#' @param adapt_act_feat logical; if \code{TRUE}, use adaptive proposal for feature index sets and number of active features.
+#' @param w_n_act vector of weights for number of active variables in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, n_act_max)}.
+#' @param w_feat vector of weights for feature indices used in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
-#' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference.
+#' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.
+#' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
-#' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class \code{"bppr_pca"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr_pca} function.
 #' @keywords nonparametric projection pursuit regression splines principle component analysis
@@ -37,7 +39,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 9000, n_thin = 1, print_every = NULL, model = 'bppr'){
+bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = NULL){
 
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc
@@ -60,12 +62,12 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
 
   run_bppr <- parse(text =
   "bppr(X, pca_Y$Y_new[, i], n_ridge_mean = n_ridge_mean, n_ridge_max = n_ridge_max,
-           n_act_max = n_act_max, df_spline = df_spline, prob_relu = prob_relu,
-           shape_var_coefs = shape_var_coefs, rate_var_coefs = rate_var_coefs,
-           n_dat_min = n_dat_min, scale_proj_dir_prop = scale_proj_dir_prop,
-           w_n_act_init = w_n_act_init, w_feat_init = w_feat_init,
-           n_post = n_post, n_burn = n_burn, n_thin = n_thin, print_every = print_every,
-           model = model)"
+        n_act_max = n_act_max, df_spline = df_spline, prob_relu = prob_relu,
+        prior_coefs = prior_coefs, shape_var_coefs = shape_var_coefs,
+        rate_var_coefs = rate_var_coefs, n_dat_min = n_dat_min,
+        scale_proj_dir_prop = scale_proj_dir_prop, adapt_act_feat = adapt_act_feat,
+        w_n_act = w_n_act, w_feat = w_feat, n_post = n_post, n_burn = n_burn,
+        n_adapt = n_adapt, n_thin = n_thin, print_every = print_every)"
   )
 
   if(n_cores == 1){
