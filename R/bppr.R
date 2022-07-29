@@ -22,10 +22,9 @@
 #' @param w_feat vector of weights for feature indices used in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
 #' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.
-#' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time
+#' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
-#' @param model "bppr" is the only valid option as of now.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
 #' @keywords nonparametric projection pursuit regression splines
@@ -35,7 +34,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = 1000){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
