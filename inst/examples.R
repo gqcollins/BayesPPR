@@ -12,7 +12,7 @@
   y <- f(X) + rnorm(n)
 
   ## fit BPPR
-  fit <- bppr(X, y)
+  fit <- bppr(X, y, adapt_act_feat = FALSE)
 
   ## plot diagnostics
   plot(fit)

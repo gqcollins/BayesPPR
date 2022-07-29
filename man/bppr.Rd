@@ -17,10 +17,12 @@ bppr(
   rate_var_coefs = NULL,
   n_dat_min = NULL,
   scale_proj_dir_prop = NULL,
-  w_n_act_init = NULL,
-  w_feat_init = NULL,
+  adapt_act_feat = FALSE,
+  w_n_act = NULL,
+  w_feat = NULL,
   n_post = 1000,
-  n_burn = 9000,
+  n_burn = 4000,
+  n_adapt = 5000,
   n_thin = 1,
   print_every = 1000,
   model = "bppr"
@@ -51,13 +53,17 @@ bppr(
 
 \item{scale_proj_dir_prop}{scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.}
 
-\item{w_n_act_init}{vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.}
+\item{adapt_act_feat}{if true, use adaptive proposal for number of active features and feature index sets.}
 
-\item{w_feat_init}{vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.}
+\item{w_n_act}{vector of weights for number of active variables in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, n_act_max)}.}
+
+\item{w_feat}{vector of weights for feature indices. to be used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.}
 
 \item{n_post}{number of posterior draws to obtain from the Markov chain after burn-in.}
 
-\item{n_burn}{number of draws to burn before obtaining \code{n_post} draws for inference.}
+\item{n_burn}{number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.}
+
+\item{n_adapt}{number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time}
 
 \item{n_thin}{keep every n_thin posterior draws after burn-in.}
 

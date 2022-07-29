@@ -17,8 +17,9 @@
 #' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
-#' @param w_n_act_init vector of initial weights for number of active variables in a ridge function, used in generating proposed basis functions. Default is \code{rep(1, n_act_max)}.
-#' @param w_feat_init vector of initial weights for features to be used in generating proposed basis functions. Default is \code{rep(1, ncol(X))}.
+#' @param adapt_act_feat logical; if \code{TRUE}, use adaptive proposal for feature index sets and number of active features.
+#' @param w_n_act vector of weights for number of active variables in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, n_act_max)}.
+#' @param w_feat vector of weights for feature indices used in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.
 #' @param n_post number of posterior draws to obtain from the Markov chain after burn-in.
 #' @param n_burn number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.
 #' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time
@@ -34,7 +35,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, w_n_act_init = NULL, w_feat_init = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = 1000, model = 'bppr'){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = 1000, model = 'bppr'){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
@@ -53,10 +54,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   n <- length(y)
   p <- ncol(X)
 
-  if(is.null(w_feat_init)){
-    w_feat_init <- rep(1, p)
+  if(is.null(w_feat)){
+    w_feat <- rep(1, p)
   }
-  w_feat <- w_feat_init
 
   mn_X <- sd_X <- numeric(p)
   X_st <- X
@@ -68,7 +68,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       sd_X[j] <- 1
       if(n_unique == 1){
         feat_type[j] <- ''
-        w_feat_init[j] <- 0
+        w_feat[j] <- 0
       }else{
         feat_type[j] <- 'cat'
       }
@@ -89,6 +89,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
   }
 
+  if(is.null(w_n_act)){
+    w_n_act <- rep(1, n_act_max)
+  }
+
   if(is.null(scale_proj_dir_prop)){
     proj_dir_prop_prec <- 1000 # scale_proj_dir_prop = 0.002
   }else if(scale_proj_dir_prop > 1  ||  scale_proj_dir_prop <= 0){
@@ -97,11 +101,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     proj_dir_prop_prec <- 1/scale_proj_dir_prop
     proj_dir_prop_prec <- (proj_dir_prop_prec - 1) + sqrt(proj_dir_prop_prec * (proj_dir_prop_prec - 1))
   }
-
-  if(is.null(w_n_act_init)){
-    w_n_act_init <- rep(1, n_act_max)
-  }
-  w_n_act <- w_n_act_init
 
   if(is.null(n_dat_min)){
     n_dat_min <- min(20, 0.1 * n)
@@ -164,6 +163,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   ssy <- c(t(y) %*% y) # Keep track of overall sse
   sse <- ssy - c_var_coefs * qf_info$qf
   log_mh_bd <- 0
+  log_mh_act_feat <- 0
 
   if(n_adapt > 0){
     phase <- 'adapt'
@@ -215,12 +215,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     if(move_type == 'birth'){ # Birth step
       n_ridge_prop <- n_ridge[idx[it]] + 1
       n_act_prop <- sample(n_act_max, 1, prob = w_n_act) # Propose number of active features
-      log_mh_nkd <- -(log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
-      if(n_act_prop == 1){
-        feat_prop <- sample(p, 1)
+      if(adapt_act_feat){
+        log_mh_act_feat <- -(log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
+        if(n_act_prop == 1){
+          feat_prop <- sample(p, 1)
+        }else{
+          feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
+          log_mh_act_feat <- log_mh_act_feat - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
+        }
       }else{
         feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
-        log_mh_nkd <- log_mh_nkd - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
       }
 
       if(all(feat_type[feat_prop] == 'cat')){ # Are all of the proposed features categorical?
@@ -260,7 +264,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
 
       if(!is.null(qf_info_prop)  &&  (sse_prop <- ssy - c_var_coefs * qf_info_prop$qf) > 0){
         # Compute the acceptance probability
-        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_nkd + # Adjustment for probability of birth proposal
+        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_act_feat + # Adjustment for probability of birth proposal
           -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge_mean/(n_ridge[idx[it]] + 1)) # Prior and proposal distribution
         if(prior_coefs == 'zs'){
@@ -289,8 +293,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           basis_mat <- basis_mat_prop
 
           #Update weights
-          w_n_act[n_act_prop] <- w_n_act[n_act_prop] + 1
-          w_feat[feat_prop] <- w_feat[feat_prop] + 1
+          if(adapt_act_feat){
+            w_n_act[n_act_prop] <- w_n_act[n_act_prop] + 1
+            w_feat[feat_prop] <- w_feat[feat_prop] + 1
+          }
 
           qf_info <- qf_info_prop
           if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
@@ -302,13 +308,14 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       j_death <- sample(n_ridge[idx[it]], 1) # Choose random index to delete
 
       n_act_prop <- n_act[[idx[it]]][j_death]
-      log_mh_nkd <- log(n_act_max) + log((w_n_act[n_act_prop] - 1)/(sum(w_n_act) - 1))
-
       feat_prop <- feat[[idx[it]]][[j_death]]
-      w_feat_prop <- w_feat;
-      w_feat_prop[feat_prop] <- w_feat_prop[feat_prop] - 1
-      if(n_act_prop > 1){
-        log_mh_nkd <- log_mh_nkd + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
+      if(adapt_act_feat){
+        log_mh_act_feat <- log(n_act_max) + log((w_n_act[n_act_prop] - 1)/(sum(w_n_act) - 1))
+        w_feat_prop <- w_feat
+        w_feat_prop[feat_prop] <- w_feat_prop[feat_prop] - 1
+        if(n_act_prop > 1){
+          log_mh_act_feat <- log_mh_act_feat + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
+        }
       }
 
       basis_mat_prop <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
@@ -325,7 +332,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         n_basis_prop <- n_basis_ridge[j_death + 1]
 
         # Compute acceptance probability
-        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_nkd + # Adjustment for probability of death proposal
+        log_mh <- log_mh_bd - log_mh_bd_prop + log_mh_act_feat + # Adjustment for probability of death proposal
           -n/2 * (log(sse_prop) - log(sse)) + # Part of the marginal likelihood
           log(n_ridge[idx[it]]/n_ridge_mean) # Prior and proposal distribution
         if(prior_coefs == 'zs'){
@@ -360,8 +367,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           basis_mat <- basis_mat_prop
 
           # Update weights
-          w_feat <- w_feat_prop
-          w_n_act[n_act_prop] <- w_n_act[n_act_prop] - 1
+          if(adapt_act_feat){
+            w_feat <- w_feat_prop
+            w_n_act[n_act_prop] <- w_n_act[n_act_prop] - 1
+          }
 
           qf_info <- qf_info_prop
           if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
@@ -443,13 +452,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               n_act = n_act, feat = feat,
               proj_dir = proj_dir, knots = knots,
               coefs = coefs, sd_resid = sd_resid,
-              w_n_act = w_n_act, w_feat = w_feat,
-              mn_X = mn_X, sd_X = sd_X,
-              df_spline = df_spline,
-              X = X, y = y, call = match.call())
+              df_spline = df_spline)
   if(prior_coefs == 'zs'){
     out$var_coefs <- var_coefs
   }
+  if(adapt_act_feat){
+    out$w_n_act <- w_n_act
+    out$w_feat <- w_feat
+  }
+  out$mn_X <- mn_X; out$sd_X <- sd_X
+  out$X <- X; out$y <- y; out$call <- match.call()
 
   if(!silent){
     cat(paste0('MCMC iteration ', n_draws, '/', n_draws, ' (', phase, ') ',

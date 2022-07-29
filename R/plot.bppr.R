@@ -44,9 +44,12 @@ plot.bppr <- function(x, quants = c(.025, .975), pred = TRUE, ...){
     points(x$y, yhat)
     abline(a = 0, b = 1, col = 2)
 
-    rg_resid <- range(hist(x$y - yhat, freq = FALSE, main = 'Posterior Mean Residuals', xlab = 'Residuals')$breaks)
-    xx <- seq(rg_resid[1], rg_resid[2], length.out = 200)
-    lines(xx, dnorm(xx, sd = mean(x$sd_resid)), xlim = rg_resid, col = 2)
+    hist_dat <- hist(x$y - yhat, plot = FALSE)
+    xx <- seq(min(hist_dat$breaks), max(hist_dat$breaks), length.out = 200)
+    mn_sd <- mean(x$sd_resid)
+    plot(hist_dat, freq = FALSE, col = 'lightgrey', main = 'Posterior Mean Residuals',
+         xlab = 'Residuals', ylim = c(0, max(hist_dat$density, dnorm(0, sd = mn_sd))))
+    lines(xx, dnorm(xx, sd = mn_sd), col = 2)
   }
   mtext('BPPR Diagnostics', 3, -2, outer=TRUE)
   par(op)
