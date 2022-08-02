@@ -12,7 +12,7 @@
   y <- f(X) + rnorm(n)
 
   ## fit BPPR
-  fit <- bppr(X, y, adapt_act_feat = FALSE)
+  fit <- bppr(X, y)
 
   ## plot diagnostics
   plot(fit)
@@ -23,4 +23,5 @@
 }
 
 ## minimal example for CRAN testing
-fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0)
+fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0, n_adapt = 0)
+
