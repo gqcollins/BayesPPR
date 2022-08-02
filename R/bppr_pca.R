@@ -39,7 +39,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 4000, n_adapt = 5000, n_thin = 1, print_every = NULL){
+bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = NULL){
 
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc

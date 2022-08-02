@@ -17,15 +17,15 @@ bppr(
   rate_var_coefs = NULL,
   n_dat_min = NULL,
   scale_proj_dir_prop = NULL,
-  adapt_act_feat = FALSE,
+  adapt_act_feat = TRUE,
   w_n_act = NULL,
   w_feat = NULL,
   n_post = 1000,
-  n_burn = 4000,
-  n_adapt = 5000,
+  n_burn = 9000,
+  n_adapt = 0,
   n_thin = 1,
   print_every = 1000,
-  model = "bppr"
+  bppr_init = NULL
 )
 }
 \arguments{
@@ -53,23 +53,23 @@ bppr(
 
 \item{scale_proj_dir_prop}{scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.}
 
-\item{adapt_act_feat}{if true, use adaptive proposal for number of active features and feature index sets.}
+\item{adapt_act_feat}{logical; if \code{TRUE}, use adaptive proposal for feature index sets and number of active features.}
 
 \item{w_n_act}{vector of weights for number of active variables in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, n_act_max)}.}
 
-\item{w_feat}{vector of weights for feature indices. to be used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.}
+\item{w_feat}{vector of weights for feature indices used in a ridge function, used in generating proposed basis functions. If \code{adapt_act_feat == FALSE}, it is also used for the prior distribution. Default is \code{rep(1, ncol(X))}.}
 
 \item{n_post}{number of posterior draws to obtain from the Markov chain after burn-in.}
 
 \item{n_burn}{number of draws to burn before obtaining \code{n_post} draws for inference. If \code{prior_coefs == "flat"} then these are absorbed into the adapt phase.}
 
-\item{n_adapt}{number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time}
+\item{n_adapt}{number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time.}
 
 \item{n_thin}{keep every n_thin posterior draws after burn-in.}
 
 \item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
 
-\item{model}{"bppr" is the only valid option as of now.}
+\item{bppr_init}{list of initial values for the Markov chain. Used by \link{bppr_resume}.}
 }
 \value{
 An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
@@ -106,7 +106,8 @@ Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x
 }
 
 ## minimal example for CRAN testing
-fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0)
+fit <- bppr(matrix(1:50), 1:50, n_post = 2, n_burn = 0, n_adapt = 0)
+
 }
 \seealso{
 \link{predict.bppr} for prediction.
