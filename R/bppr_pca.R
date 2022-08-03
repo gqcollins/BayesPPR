@@ -29,6 +29,7 @@
 #' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
+#' @param bppr_init_list list of length \code{n_pc}, each element containing a list initial values for the Markov chain. Used by \link{bppr_resume}.
 #' @details Explores BayesPPR model space using RJMCMC. The BayesPPR model has \deqn{y = f(x) + \epsilon,  ~~\epsilon \sim N(0,\sigma^2)} \deqn{f(x) = \beta_0 + \sum_{j=1}^M \beta_j B_j(x)} and \eqn{B_j(x)} is a natural spline basis expansion. We use priors \deqn{\beta \sim N(0,\sigma^2/\tau (B'B)^{-1})} \deqn{M \sim Poisson(\lambda)} as well as the hyper-prior on the variance \eqn{\tau} of the coefficients \eqn{\beta} mentioned in the arguments above.
 #' @return An object of class \code{"bppr_pca"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr_pca} function.
 #' @keywords nonparametric projection pursuit regression splines principle component analysis
@@ -39,7 +40,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = NULL){
+bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = NULL, bppr_init_list = NULL){
 
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc
@@ -60,14 +61,21 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
     }
   }
 
-  run_bppr <- parse(text =
+  if(is.null(bppr_init_list)){
+    bppr_init_code <- "NULL"
+  }else{
+    bppr_init_code <- "bppr_init_list[[i]]"
+  }
+
+  run_bppr <- parse(text = paste0(
   "bppr(X, pca_Y$Y_new[, i], n_ridge_mean = n_ridge_mean, n_ridge_max = n_ridge_max,
         n_act_max = n_act_max, df_spline = df_spline, prob_relu = prob_relu,
         prior_coefs = prior_coefs, shape_var_coefs = shape_var_coefs,
         rate_var_coefs = rate_var_coefs, n_dat_min = n_dat_min,
         scale_proj_dir_prop = scale_proj_dir_prop, adapt_act_feat = adapt_act_feat,
         w_n_act = w_n_act, w_feat = w_feat, n_post = n_post, n_burn = n_burn,
-        n_adapt = n_adapt, n_thin = n_thin, print_every = print_every)"
+        n_adapt = n_adapt, n_thin = n_thin, print_every = print_every,
+        bppr_init = ", bppr_init_code, ")")
   )
 
   if(n_cores == 1){
@@ -81,6 +89,7 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
       mc.cores = n_cores, mc.preschedule = FALSE)
   }
 
- structure(list(pca_Y = pca_Y, fit_list = fit_list),
+ structure(list(pca_Y = pca_Y, fit_list = fit_list,
+                n_cores = n_cores, par_type = par_type),
            class = 'bppr_pca')
 }

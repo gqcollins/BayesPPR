@@ -205,6 +205,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
       }
       n_quant <- length(j_quant)
     }
+    w_n_act <- bppr_init$w_n_act
+    w_feat <- bppr_init$w_feat
   }
 
   n_basis_total <- sum(n_basis_ridge)

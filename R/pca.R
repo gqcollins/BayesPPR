@@ -33,14 +33,14 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
   }
 
   mn_Y <- sd_Y <- numeric(D)
-  Y_std <- matrix(nrow = n, ncol = D)
+  Y_st <- matrix(nrow = n, ncol = D)
   for(k in 1:D){
     mn_Y[k] <- mean(Y[, k])
     sd_Y[k] <- sd(Y[, k])
-    Y_std[, k] <- (Y[, k] - mn_Y[k]) / sd_Y[k]
+    Y_st[, k] <- (Y[, k] - mn_Y[k]) / sd_Y[k]
   }
 
-  svd_Y <- svd(t(Y_std))
+  svd_Y <- svd(t(Y_st))
   ev_Y <- svd_Y$d^2
 
   if(is.null(n_pc)){
@@ -50,10 +50,10 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
   basis_Y <- svd_Y$u[, 1:n_pc, drop=FALSE] %*% diag(svd_Y$d[1:n_pc], nrow = n_pc) # columns are basis functions
   Y_new <- svd_Y$v[, 1:n_pc, drop=FALSE]
 
-  trunc_error <- Y_new %*% t(basis_Y) - Y_std
+  trunc_error <- Y_new %*% t(basis_Y) - Y_st
 
-  out <- list(X = X, Y = Y, n_pc = n_pc, basis_Y = basis_Y, Y_new = Y_new,
-              trunc_error = trunc_error, mn_Y = mn_Y, sd_Y = sd_Y, ev_Y = ev_Y)
+  out <- list(basis_Y = basis_Y, Y_new = Y_new, trunc_error = trunc_error, ev_Y = ev_Y,
+              X = X, Y = Y, mn_Y = mn_Y, sd_Y = sd_Y, n_pc = n_pc, prop_var = prop_var)
 
   return(out)
 }

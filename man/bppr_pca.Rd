@@ -25,10 +25,11 @@ bppr_pca(
   w_n_act = NULL,
   w_feat = NULL,
   n_post = 1000,
-  n_burn = 4000,
-  n_adapt = 5000,
+  n_burn = 9000,
+  n_adapt = 0,
   n_thin = 1,
-  print_every = NULL
+  print_every = NULL,
+  bppr_init_list = NULL
 )
 }
 \arguments{
@@ -79,6 +80,8 @@ bppr_pca(
 \item{n_thin}{keep every n_thin posterior draws after burn-in.}
 
 \item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
+
+\item{bppr_init_list}{list of length \code{n_pc}, each element containing a list initial values for the Markov chain. Used by \link{bppr_resume}.}
 }
 \value{
 An object of class \code{"bppr_pca"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr_pca} function.
