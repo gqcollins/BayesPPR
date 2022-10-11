@@ -4,7 +4,7 @@
 
 #' @title BayesPPR Predictions
 #'
-#' @description Predict function for BayesPPR. Outputs the posterior predictive samples for the desired MCMC iterations.
+#' @description Predict function for BayesPPR. Outputs posterior predictive samples for the desired MCMC iterations.
 #' @param object a fitted model, output from the \code{bppr} function.
 #' @param newdata a matrix of new input values at which to predict.  The columns should correspond to the same variables used in the \code{bppr} function.
 #' @param idx_use index of Markov samples to use when generating predictions.
