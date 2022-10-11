@@ -129,7 +129,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
     var_coefs <- numeric(n_keep)
   }else if(prior_coefs == 'flat'){
-    var_coefs <- NULL
+    var_coefs <- NA
     c_var_coefs <- 1
   }else{
     stop("prior_coefs must be either 'zs' or 'flat'")
@@ -440,7 +440,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           }
         }
       }else{ # Change Step
-        if(n_quant  == 1){
+        if(n_quant == 1){
           j_change <- j_quant
         }else{
           j_change <- sample(j_quant, 1) # Which ridge function should we change?
