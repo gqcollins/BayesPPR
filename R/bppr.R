@@ -495,13 +495,13 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
         }
 
+        sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, sse/2))
+
         # Draw coefs
         coefs[[idx[it]]] <- c_var_coefs * qf_info$ls_est +
           sqrt(c_var_coefs) * sd_resid[idx[it]] * qf_info$inv_chol %*% rnorm(n_basis_total) # Draw coefs
         preds <- basis_mat %*% coefs[[idx[it]]] # Current predictions of y
         resid <- y - preds # current residuals
-
-        sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(resid %*% resid)/2))
 
         if(prior_coefs == 'zs'){
           var_coefs[idx[it]] <- 1/rgamma(1,
