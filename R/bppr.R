@@ -14,7 +14,7 @@
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
 #' @param prior_coefs form of the prior distribution for the basis coefficients. Default is \code{"zs"} for the Zellner-Siow prior. The other option is \code{"flat"}, which is an improper prior.
 #' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.
-#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.
+#' @param scale_var_coefs scale for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{scale_var_coefs} is ignored.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
 #' @param adapt_act_feat logical; if \code{TRUE}, use adaptive proposal for feature index sets and number of active features.
@@ -35,7 +35,7 @@
 #' @import utils
 #' @example inst/examples.R
 #'
-bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = 1000, bppr_init = NULL){
+bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, scale_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = 1000, bppr_init = NULL){
   # Manage posterior draws
   if(n_thin > n_post){
     stop('n_thin > n_post. No posterior samples will be obtained.')
@@ -124,8 +124,8 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     if(is.null(shape_var_coefs)){
       shape_var_coefs <- 0.5
     }
-    if(is.null(rate_var_coefs)){
-      rate_var_coefs <- n/2
+    if(is.null(scale_var_coefs)){
+      scale_var_coefs <- n/2
     }
     var_coefs <- numeric(n_keep)
   }else if(prior_coefs == 'flat'){
@@ -153,7 +153,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   # Initialization
   if(is.null(bppr_init)){
     if(prior_coefs == 'zs'){
-      var_coefs[1] <- rate_var_coefs / shape_var_coefs
+      var_coefs[1] <- scale_var_coefs / shape_var_coefs
       c_var_coefs <- var_coefs[1] / (var_coefs[1] + 1)
     }
     sd_resid[1] <- 1
@@ -501,12 +501,12 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         preds <- basis_mat %*% coefs[[idx[it]]] # Current predictions of y
         resid <- y - preds # current residuals
 
-        sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(t(resid) %*% resid)/2))
+        sd_resid[idx[it]] <- sqrt(1/rgamma(1, n/2, c(resid %*% resid)/2))
 
         if(prior_coefs == 'zs'){
           var_coefs[idx[it]] <- 1/rgamma(1,
                                          shape_var_coefs + n_basis_total/2,
-                                         rate_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
+                                         scale_var_coefs + c(t(preds) %*% preds)/(2*sd_resid[idx[it]]^2))
           c_var_coefs <- var_coefs[idx[it]] / (var_coefs[idx[it]] + 1)
           sse <- ssy - c_var_coefs * qf_info$qf
         }
@@ -522,7 +522,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               n_ridge_mean = n_ridge_mean, n_ridge_max = n_ridge_max,
               n_act_max = n_act_max, df_spline = df_spline, prob_relu = prob_relu,
               prior_coefs = prior_coefs, shape_var_coefs = shape_var_coefs,
-              rate_var_coefs = rate_var_coefs, n_dat_min = n_dat_min,
+              scale_var_coefs = scale_var_coefs, n_dat_min = n_dat_min,
               scale_proj_dir_prop = scale_proj_dir_prop,
               adapt_act_feat = adapt_act_feat, w_n_act = w_n_act,
               w_feat = w_feat, n_post = n_post, n_burn = n_burn,

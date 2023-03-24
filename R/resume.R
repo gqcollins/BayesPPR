@@ -42,7 +42,7 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
                 n_ridge_max = object$n_ridge_max, n_act_max = object$n_act_max,
                 df_spline = object$df_spline, prob_relu = object$prob_relu,
                 prior_coefs = object$prior_coefs, shape_var_coefs = object$shape_var_coefs,
-                rate_var_coefs = object$rate_var_coefs, n_dat_min = object$n_dat_min,
+                scale_var_coefs = object$scale_var_coefs, n_dat_min = object$n_dat_min,
                 scale_proj_dir_prop = object$scale_proj_dir_prop,
                 adapt_act_feat = object$adapt_act_feat, n_post = n_post, n_burn = n_burn,
                 n_adapt = n_adapt, n_thin = n_thin, print_every = print_every,
@@ -85,7 +85,7 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
                     n_ridge_mean = object$fit_list[[1]]$n_ridge_mean, n_ridge_max = object$fit_list[[1]]$n_ridge_max,
                     n_act_max = object$fit_list[[1]]$n_act_max, df_spline = object$fit_list[[1]]$df_spline,
                     prob_relu = object$fit_list[[1]]$prob_relu, prior_coefs = object$fit_list[[1]]$prior_coefs,
-                    shape_var_coefs = object$fit_list[[1]]$shape_var_coefs, rate_var_coefs = object$fit_list[[1]]$rate_var_coefs,
+                    shape_var_coefs = object$fit_list[[1]]$shape_var_coefs, scale_var_coefs = object$fit_list[[1]]$scale_var_coefs,
                     n_dat_min = object$fit_list[[1]]$n_dat_min, scale_proj_dir_prop = object$fit_list[[1]]$scale_proj_dir_prop,
                     adapt_act_feat = object$fit_list[[1]]$adapt_act_feat, n_post = n_post, n_burn = n_burn, n_adapt = n_adapt,
                     n_thin = n_thin, print_every = print_every, bppr_init_list = bppr_init_list)

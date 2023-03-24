@@ -18,7 +18,7 @@
 #' @param prob_relu prior probability that any given ridge function uses a relu transformation.
 #' @param prior_coefs form of the prior distribution for the basis coefficients. Default is \code{"zs"} for the Zellner-Siow prior. The other option is \code{"flat"}, which is an improper prior.
 #' @param shape_var_coefs shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.
-#' @param rate_var_coefs rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.
+#' @param scale_var_coefs scale for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{scale_var_coefs} is ignored.
 #' @param n_dat_min minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.
 #' @param scale_proj_dir_prop scale parameter for generating proposed projection directions. Should be in (0, 1); default is about 0.002.
 #' @param adapt_act_feat logical; if \code{TRUE}, use adaptive proposal for feature index sets and number of active features.
@@ -40,7 +40,7 @@
 #' @examples
 #' # See examples in bppr documentation.
 #'
-bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, rate_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = NULL, bppr_init_list = NULL){
+bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type = 'fork', n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, df_spline = 4, prob_relu = 2/3, prior_coefs = "zs", shape_var_coefs = NULL, scale_var_coefs = NULL, n_dat_min = NULL, scale_proj_dir_prop = NULL, adapt_act_feat = TRUE, w_n_act = NULL, w_feat = NULL, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = NULL, bppr_init_list = NULL){
 
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc
@@ -71,7 +71,7 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
   "bppr(X, pca_Y$Y_new[, i], n_ridge_mean = n_ridge_mean, n_ridge_max = n_ridge_max,
         n_act_max = n_act_max, df_spline = df_spline, prob_relu = prob_relu,
         prior_coefs = prior_coefs, shape_var_coefs = shape_var_coefs,
-        rate_var_coefs = rate_var_coefs, n_dat_min = n_dat_min,
+        scale_var_coefs = scale_var_coefs, n_dat_min = n_dat_min,
         scale_proj_dir_prop = scale_proj_dir_prop, adapt_act_feat = adapt_act_feat,
         w_n_act = w_n_act, w_feat = w_feat, n_post = n_post, n_burn = n_burn,
         n_adapt = n_adapt, n_thin = n_thin, print_every = print_every,
