@@ -1,20 +1,17 @@
-get_qf_info <- function(X, y){
-  Xt <- t(X)
-  XtX <- Xt %*% X
-  chol_XtX <- tryCatch(chol(XtX), error = function(e) matrix(FALSE))
-  if(chol_XtX[1, 1]){
-    d <- diag(chol_XtX)
+get_qf_info <- function(BtB, Bty){
+  chol_BtB <- tryCatch(chol(BtB), error = function(e) matrix(FALSE))
+  if(chol_BtB[1, 1]){
+    d <- diag(chol_BtB)
     if(length(d) > 1){
       if((max(d[-1]) / min(d)) > 1000){
         return(NULL)
       }
     }
-    Xty <- Xt %*% y
-    bhat <- backsolve(chol_XtX, forwardsolve(chol_XtX, Xty,
+    bhat <- backsolve(chol_BtB, forwardsolve(chol_BtB, Bty,
                                              transpose = TRUE,
                                              upper.tri = TRUE))
-    qf <- t(Xty) %*% bhat
-    return(list(chol = chol_XtX, ls_est = bhat, qf = qf))
+    qf <- t(Bty) %*% bhat
+    return(list(chol = chol_BtB, ls_est = bhat, qf = qf))
   }else{
     return(NULL)
   }

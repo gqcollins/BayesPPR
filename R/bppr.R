@@ -141,14 +141,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   feat <- vector('list', n_keep) # Features being used in jth ridge function
   knots <- vector('list', n_keep) # Location of knots for nsplines
   proj_dir <- vector('list', n_keep) # Ridge directions
-  proj_dir_mn <- lapply(1:n_act_max, function(a) rep(1/sqrt(a), a)) # prior mean for proj_dir (arbitrary, since precision is zero)
+  proj_dir_mn <- lapply(1:n_act_max, function(a) rep(1/sqrt(a), a)) # prior mean for proj_dir (arbitrary, since prior precision is zero)
 
-  n_basis_ridge <- 1 # Number of basis functions in each ridge function
+  n_basis_ridge <- 1 # Number of basis functions in each ridge function (first ridge function is the intercept)
   ridge_type <- character()
-  j_quant <- integer()
-  n_quant <- 0
+  j_quant <- integer() # which ridge functions are quantitative?
+  n_quant <- 0 # how many ridge functions are quantitative?
   basis_mat <- matrix(rep(1, n)) # Current basis matrix
   basis_idx <- list(1) # Current indices of segments of basis functions
+  BtB <- matrix(nrow = n_ridge_max * df_spline + 1, ncol = n_ridge_max * df_spline + 1)
+  Bty <- numeric(n_ridge_max * df_spline + 1)
 
   # Initialization
   if(is.null(bppr_init)){
@@ -210,7 +212,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
 
   n_basis_total <- sum(n_basis_ridge)
-  qf_info <- get_qf_info(basis_mat, y)
+  BtB[1:n_basis_total, 1:n_basis_total] <- t(basis_mat) %*% basis_mat # inner product of basis_mat with itself
+  Bty[1:n_basis_total] <- t(basis_mat) %*% y # inner product of basis_mat with y
+  qf_info <- get_qf_info(BtB[1:n_basis_total, 1:n_basis_total, drop = FALSE], Bty[1:n_basis_total])
   if(n_adapt == 0) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
 
   ssy <- c(t(y) %*% y) # Keep track of overall sse
@@ -312,8 +316,19 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           }
         }
 
-        basis_mat_prop <- cbind(basis_mat, ridge_basis_prop)
-        qf_info_prop <- get_qf_info(basis_mat_prop, y)
+        PtP <- t(ridge_basis_prop) %*% ridge_basis_prop # inner product of proposed new basis functions
+        BtP <- t(basis_mat) %*% ridge_basis_prop
+        Pty <- t(ridge_basis_prop) %*% y
+
+        j_birth <- n_ridge[idx[it]] + 1
+        basis_idx_start <- basis_idx[[j_birth]][n_basis_ridge[j_birth]]
+        basis_idx_prop <- (basis_idx_start + 1):(basis_idx_start + n_basis_prop)
+        BtB[1:n_basis_total, basis_idx_prop] <- BtP
+        BtB[basis_idx_prop, 1:n_basis_total] <- t(BtP)
+        BtB[basis_idx_prop, basis_idx_prop] <- PtP
+        Bty[basis_idx_prop] <- Pty
+
+        qf_info_prop <- get_qf_info(BtB[1:(n_basis_total + n_basis_prop), 1:(n_basis_total + n_basis_prop)], Bty[1:(n_basis_total + n_basis_prop)])
         log_mh_bd_prop <- get_log_mh_bd(n_ridge_prop, n_quant_prop, n_ridge_max)
 
         if(!is.null(qf_info_prop)){
@@ -331,7 +346,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
             }
 
             if(log(runif(1)) < log_mh){ # Accept the proposal
-              n_ridge[idx[it]] <- j_birth <- n_ridge[idx[it]] + 1
+              n_ridge[idx[it]] <- j_birth
               n_act[[idx[it]]][j_birth] <- n_act_prop
               feat[[idx[it]]][[j_birth]] <- feat_prop
               knots[[idx[it]]][[j_birth]] <- knots_prop
@@ -343,11 +358,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               }
               ridge_type[j_birth] <- ridge_type_prop
 
-              basis_idx_start <- basis_idx[[j_birth]][n_basis_ridge[j_birth]]
-              basis_idx[[j_birth + 1]] <- (basis_idx_start + 1):(basis_idx_start + n_basis_prop)
+              basis_idx[[j_birth + 1]] <- basis_idx_prop
               n_basis_ridge[j_birth + 1] <- n_basis_prop
               n_basis_total <- n_basis_total + n_basis_prop
-              basis_mat <- basis_mat_prop
+              basis_mat <- cbind(basis_mat, ridge_basis_prop)
 
               # Update weights
               if(adapt_act_feat){
@@ -376,14 +390,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           }
         }
 
-        basis_mat_prop <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
-        qf_info_prop <- get_qf_info(basis_mat_prop, y)
+        basis_idx_vec_prop <- unlist(basis_idx)[-basis_idx[[j_death + 1]]]
+        qf_info_prop <- get_qf_info(BtB[basis_idx_vec_prop, basis_idx_vec_prop, drop = FALSE], Bty[basis_idx_vec_prop])
+
         n_ridge_prop <- n_ridge[idx[it]] - 1
         if(ridge_type[j_death] == 'cat'){
           n_quant_prop <- n_quant
         }else{
           n_quant_prop <- n_quant - 1
         }
+
         log_mh_bd_prop <- get_log_mh_bd(n_ridge_prop, n_quant_prop, n_ridge_max)
 
         if(!is.null(qf_info_prop)){
@@ -402,12 +418,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
             }
 
             if(log(runif(1)) < log_mh){ # Accept the proposal
-              if(j_death < n_ridge[idx[it]]){
-                for(j in (j_death + 1):n_ridge[idx[it]]){
-                  basis_idx[[j + 1]] <- basis_idx[[j + 1]] - n_basis_ridge[j_death + 1]
-                }
-              }
-
               if(ridge_type[j_death] != 'cat'){
                 n_quant <- n_quant - 1
                 j_quant <- j_quant[j_quant != j_death]
@@ -415,7 +425,16 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               j_quant[j_quant > j_death] <- j_quant[j_quant > j_death] - 1
               ridge_type <- ridge_type[-j_death]
 
+              basis_mat <- basis_mat[, -basis_idx[[j_death + 1]], drop = FALSE]
+              BtB[1:(n_basis_total - n_basis_prop), 1:(n_basis_total - n_basis_prop)] <- BtB[basis_idx_vec_prop, basis_idx_vec_prop, drop = FALSE]
+              Bty[1:(n_basis_total - n_basis_prop)] <- Bty[basis_idx_vec_prop]
+              if(j_death < n_ridge[idx[it]]){
+                for(j in (j_death + 1):n_ridge[idx[it]]){
+                  basis_idx[[j + 1]] <- basis_idx[[j + 1]] - n_basis_ridge[j_death + 1]
+                }
+              }
               basis_idx <- basis_idx[-(j_death + 1)]
+
               n_basis_ridge <- n_basis_ridge[-(j_death + 1)]
               n_basis_total <- n_basis_total - n_basis_prop
               n_ridge[idx[it]] <- n_ridge[idx[it]] - 1
@@ -423,8 +442,6 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               feat[[idx[it]]] <- feat[[idx[it]]][-j_death]
               knots[[idx[it]]] <- knots[[idx[it]]][-j_death]
               proj_dir[[idx[it]]] <- proj_dir[[idx[it]]][-j_death]
-
-              basis_mat <- basis_mat_prop
 
               # Update weights
               if(adapt_act_feat){
@@ -465,9 +482,19 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           ridge_basis_prop <- proj_prop
         }
 
-        basis_mat_prop <- basis_mat
-        basis_mat_prop[, basis_idx[[j_change + 1]]] <- ridge_basis_prop
-        qf_info_prop <- get_qf_info(basis_mat_prop, y)
+        PtP <- t(ridge_basis_prop) %*% ridge_basis_prop # inner product of proposed new basis functions
+        BtP <- t(basis_mat) %*% ridge_basis_prop
+        Pty <- t(ridge_basis_prop) %*% y
+
+        BtB_prop <- BtB[1:n_basis_total, 1:n_basis_total]
+        BtB_prop[basis_idx[[j_change + 1]], ] <- t(BtP)
+        BtB_prop[, basis_idx[[j_change + 1]]] <- BtP
+        BtB_prop[basis_idx[[j_change + 1]], basis_idx[[j_change + 1]]] <- PtP
+
+        Bty_prop <- Bty[1:n_basis_total]
+        Bty_prop[basis_idx[[j_change + 1]]] <- Pty
+
+        qf_info_prop <- get_qf_info(BtB_prop, Bty_prop)
 
         if(!is.null(qf_info_prop)){
           if(qf_info_prop$qf < ssy){
@@ -480,7 +507,9 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
               knots[[idx[it]]][[j_change]] <- knots_prop
               proj_dir[[idx[it]]][[j_change]] <- proj_dir_prop
 
-              basis_mat <- basis_mat_prop
+              BtB[1:n_basis_total, 1:n_basis_total] <- BtB_prop
+              Bty[1:n_basis_total] <- Bty_prop
+              basis_mat[, basis_idx[[j_change + 1]]] <- ridge_basis_prop
 
               qf_info <- qf_info_prop
               if(it > n_adapt) qf_info <- append_qf_inv_chol(qf_info, dim = n_basis_total)
