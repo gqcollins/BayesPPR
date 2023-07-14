@@ -112,7 +112,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   p_dat_max <- 1 - n_dat_min / n # Maximum proportion of inactive datapoints in each ridge function
 
   if(is.null(n_ridge_max)){
-    n_ridge_max <- min(150, floor(length(y)/df_spline) - 2)
+    n_ridge_max <- min(150, floor(n/df_spline) - 2)
   }
   if(n_ridge_max <= 0){
     stop('n_ridge_max <= 0. If n_ridge_max was set by default, df_spline is too large compared to the sample size.')
