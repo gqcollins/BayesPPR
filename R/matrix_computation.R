@@ -1,6 +1,6 @@
 get_qf_info <- function(BtB, Bty){
   chol_BtB <- tryCatch(chol(BtB), error = function(e) matrix(FALSE))
-  if(chol_BtB[1, 1]){
+  if(chol_BtB[1, 1]  &&  !any(is.na(chol_BtB))){
     d <- diag(chol_BtB)
     if(length(d) > 1){
       if((max(d[-1]) / min(d)) > 1000){
