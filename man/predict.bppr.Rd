@@ -19,7 +19,7 @@
 A matrix with the same number of rows as \code{newdata} and columns corresponding to all MCMC iterations indexed by idx_use. These are samples from the posterior predictive distribution.
 }
 \description{
-Predict function for BayesPPR. Outputs the posterior predictive samples for the desired MCMC iterations.
+Predict function for BayesPPR. Outputs posterior predictive samples for the desired MCMC iterations.
 }
 \details{
 Bare-bones methods. Could be improved for efficiency.

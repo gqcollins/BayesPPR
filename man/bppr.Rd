@@ -14,7 +14,7 @@ bppr(
   prob_relu = 2/3,
   prior_coefs = "zs",
   shape_var_coefs = NULL,
-  rate_var_coefs = NULL,
+  scale_var_coefs = NULL,
   n_dat_min = NULL,
   scale_proj_dir_prop = NULL,
   adapt_act_feat = TRUE,
@@ -47,7 +47,7 @@ bppr(
 
 \item{shape_var_coefs}{shape for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{shape_var_coefs} is ignored.}
 
-\item{rate_var_coefs}{rate for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{rate_var_coefs} is ignored.}
+\item{scale_var_coefs}{scale for IG prior on the variance of the basis function coefficients. Default is for the Zellner-Siow prior. For the flat, improper prior, \code{scale_var_coefs} is ignored.}
 
 \item{n_dat_min}{minimum number of observed non-zero datapoints in a ridge function. Defaults to 20 or 0.1 times the number of observations, whichever is smaller.}
 
