@@ -19,12 +19,9 @@
 #' @export
 #' @import stats
 #' @import utils
-#' @example
-#' # See examples in bppr documentation.
-#'
 bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = 1000){
 
-  if(class(object) == "bppr"){
+  if(methods::is(object,"bppr")){
     n_keep <- object$n_keep
     if(object$prior_coefs == 'zs'){
       var_coefs_init <- object$var_coefs[n_keep]
@@ -62,7 +59,7 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
       fit$n_burn <- c(object$n_burn, fit$n_burn)
       fit$n_adapt <- c(object$n_adapt, fit$n_adapt)
     }
-  }else if(class(object) == "bppr_pca"){
+  }else if(methods::is(object,"bppr_pca")){
     n_keep <- object$fit_list[[1]]$n_keep
 
     bppr_init_list <- lapply(1:object$pca_Y$n_pc, function(k){

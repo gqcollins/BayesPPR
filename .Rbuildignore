@@ -1,5 +1,14 @@
-^BayesPPR\.Rproj$
+^.*\.Rproj$
 ^\.Rproj\.user$
-^LICENSE\.md$
+^CRAN-SUBMISSION$
+^\.github$
+^\src\*.a
+^\src\*.o
+^\src\*.so
+impala.Rproj
+cran-comments.md
+^.*\.Rproj$
+^revdep$
 ^\.positai$
 ^\.claude$
+^cran-comments\.md$

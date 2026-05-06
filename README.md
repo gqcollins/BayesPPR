@@ -1,5 +1,10 @@
 # BayesPPR
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/gqcollins/BayesPPR//actions/workflows/r.yml/badge.svg)](https://github.com/gqcollins/BayesPPR//actions/workflows/r.yml)
+<!--[![CRAN status](https://www.r-pkg.org/badges/version/BayesPPR)](https://CRAN.R-project.org/package=BayesPPR)-->
+<!-- badges: end -->
+
 
 ## Description
 

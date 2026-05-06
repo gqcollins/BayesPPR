@@ -13,7 +13,7 @@
 #' # See examples in bppr documentation.
 #'
 plot.bppr <- function(x, quants = c(.025, .975), pred = TRUE, ...){
-  if(class(x) != 'bppr'){
+  if(!methods::is(x, 'bppr')){
     stop('x must be an object of class bppr')
   }
 
