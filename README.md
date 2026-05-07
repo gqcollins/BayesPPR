@@ -2,13 +2,35 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/gqcollins/BayesPPR//actions/workflows/r.yml/badge.svg)](https://github.com/gqcollins/BayesPPR//actions/workflows/r.yml)
-<!--[![CRAN status](https://www.r-pkg.org/badges/version/BayesPPR)](https://CRAN.R-project.org/package=BayesPPR)-->
+[![CRAN status](https://www.r-pkg.org/badges/version/BayesPPR)](https://CRAN.R-project.org/package=BayesPPR)
 <!-- badges: end -->
 
 
 ## Description
 
 BayesPPR is an R package used for fitting a Bayesian Projection Pursuit Regression model.
+
+### Installation
+------------------------------------------------------------------------------
+v0.1.0 is on [CRAN](https://cran.r-project.org/package=BayesPPR) and can
+be installed as
+
+``` r
+install.packages("BayesPPR")`
+```
+
+For a more up to date, but may not be stable version from git
+repository.
+
+1.  Download zip or tar.gz of package or clone repository
+2.  Install into R (\> 4.3.0)
+
+``` r
+library(devtools)
+install_github("gqcollins/BayesPPR")
+```
+
+------------------------------------------------------------------------------
 
 
 ## Attribution
