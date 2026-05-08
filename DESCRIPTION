@@ -11,8 +11,9 @@ Authors@R: c(
            role = c("ctb", "cre"),
            email = "jdtuck@sandia.gov",
            comment = c(ORCID = "0000-0001-8844-2169")))
-Description: Bayesian fitting of projection pursuit regression model. Built to handle continuous and categorical inputs and
-    scalar output.
+Description: Bayesian fitting of projection pursuit regression model. 
+  Built to handle continuous and categorical inputs and
+  scalar output. (Collins et al., 2023 <DOI:10.1007/s11222-023-10334-z>)
 License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
