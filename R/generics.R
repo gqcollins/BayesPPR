@@ -4,6 +4,7 @@
 #' @description Print some of the details of a BPPR model.
 #' @param x a \code{bppr} object, returned from \code{bppr}.
 #' @param ... further arguments passed to or from other methods.
+#' @return no return value
 #' @export
 #'
 print.bppr <- function(x, ...){
@@ -22,6 +23,7 @@ print.bppr <- function(x, ...){
 #' @description Summarize some of the details of a BPPR model.
 #' @param object a \code{bppr} object, returned from \code{bppr}.
 #' @param ... further arguments passed to or from other methods.
+#' @return no return value
 #' @export
 #'
 summary.bppr <- function(object,...){

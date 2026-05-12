@@ -6,6 +6,7 @@
 #' @param pred logical, whether posterior predictions should be plotted (defaults to TRUE).
 #' @param ... graphical parameters.
 #' @details The first two plots are trace plots for diagnosing convergence.  The third plot is posterior predicted vs observed, with intervals for predictions.  The fourth plot is a histogram of the residuals (of the posterior mean model), with a red curve showing the assumed Normal density (using posterior mean variance). If \code{pred=FALSE} the third and fourth plots are omitted.
+#' @return no return value
 #' @export
 #' @import graphics
 #' @seealso \link{bppr}, \link{predict.bppr}
@@ -18,6 +19,7 @@ plot.bppr <- function(x, quants = c(.025, .975), pred = TRUE, ...){
   }
 
   op <- par(no.readonly = TRUE)
+  on.exit(par(op))
   if(pred){
     par(mfrow = c(2, 2))
   }else{
@@ -52,6 +54,5 @@ plot.bppr <- function(x, quants = c(.025, .975), pred = TRUE, ...){
     lines(xx, dnorm(xx, sd = mn_sd), col = 2)
   }
   mtext('BPPR Diagnostics', 3, -2, outer=TRUE)
-  par(op)
 }
 

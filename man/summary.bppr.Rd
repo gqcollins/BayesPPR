@@ -11,6 +11,9 @@
 
 \item{...}{further arguments passed to or from other methods.}
 }
+\value{
+no return value
+}
 \description{
 Summarize some of the details of a BPPR model.
 }

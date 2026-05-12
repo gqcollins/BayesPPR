@@ -15,6 +15,9 @@
 
 \item{...}{graphical parameters.}
 }
+\value{
+no return value
+}
 \description{
 Generate diagnostic plots for BPPR model fit.
 }
