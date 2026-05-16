@@ -8,6 +8,8 @@
 
 ## Description
 
+![](man/figures/logo.png)
+
 BayesPPR is an R package used for fitting a Bayesian Projection Pursuit Regression model. (Collins et al., 2023 <DOI:10.1007/s11222-023-10334-z>)
 
 ### Installation
