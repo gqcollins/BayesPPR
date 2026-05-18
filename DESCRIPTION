@@ -1,6 +1,6 @@
 Package: BayesPPR
 Title: Bayesian Projection Pursuit Regression
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: c(
     person(given = "Gavin", 
            family = "Collins", 
