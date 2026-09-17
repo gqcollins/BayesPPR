@@ -23,18 +23,25 @@ predict.bppr_pca <-function(object, newdata, idx_use = NULL, n_cores = 1, par_ty
   n_keep <- object$fit_list[[1]]$n_keep
   if(is.null(idx_use)){
     idx_use <- 1:n_keep
-  }else if(max(idx_use) > n_keep){
-    stop("invalid 'idx_use'")
+  }else{
+    idx_use <- check_idx_use(idx_use, n_keep)
   }
   n_use <- length(idx_use)
 
+  newdata <- as.matrix(newdata)
   n <- nrow(newdata)
   D <- length(object$pca_Y$mn_Y)
 
   n_pc <- object$pca_Y$n_pc
 
+  if(!par_type %in% c('fork', 'socket')){
+    stop("par_type must be either 'fork' or 'socket'")
+  }
+  n_cores <- min(n_cores, get_n_cores_max())
+
   run_predict <- parse(text = 'predict(object$fit_list[[i]], newdata, idx_use = idx_use, ...)')
-  run_pca_reverse <- parse(text = 'pca_reverse(preds_Y_new[i, , ], object$pca_Y)')
+  # matrix() guards against the n x n_pc slice being dropped to a vector when n == 1 or n_pc == 1
+  run_pca_reverse <- parse(text = 'pca_reverse(matrix(preds_Y_new[i, , ], nrow = n, ncol = n_pc), object$pca_Y)')
 
   if(n_cores == 1){
     preds_Y_new <- array(
@@ -44,7 +51,7 @@ predict.bppr_pca <-function(object, newdata, idx_use = NULL, n_cores = 1, par_ty
       unlist(lapply(1:n_use, function(i) eval(run_pca_reverse))),
       dim = c(D, n, n_use))
   }else if(par_type == "socket"){
-    cl <- parallel::makeCluster(min(n_cores, n_pc, parallel::detectCores()),
+    cl <- parallel::makeCluster(min(n_cores, n_pc),
                                 setup_strategy = "sequential")
     parallel::clusterExport(cl, varlist = c("newdata"), envir = environment())
     preds_Y_new <- array(

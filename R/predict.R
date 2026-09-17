@@ -18,10 +18,16 @@
 #'
 predict.bppr <- function(object, newdata, idx_use = NULL, ...){
   newdata <- as.matrix(newdata)
+  if(!is.numeric(newdata)){
+    stop("'newdata' must be numeric")
+  }
   n <- nrow(newdata)
   p <- ncol(newdata)
   mn_X <- object$mn_X
   sd_X <- object$sd_X
+  if(p != length(mn_X)){
+    stop(paste0("'newdata' has ", p, " columns; the fitted model was built with ", length(mn_X)))
+  }
   for(j in 1:p){
     newdata[, j] <- (newdata[, j] - mn_X[j]) / sd_X[j]
   }
@@ -36,8 +42,8 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
 
   if(is.null(idx_use)){
     idx_use <- 1:n_keep
-  }else if(max(idx_use) > n_keep){
-    stop("invalid 'idx_use'")
+  }else{
+    idx_use <- check_idx_use(idx_use, n_keep)
   }
   n_use <- length(idx_use)
 
@@ -54,26 +60,30 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
       }
       basis_idx_start <- 2
       for(j in 1:n_ridge[idx_use[i]]){
+        # A ridge function's basis is determined by its features, direction, and knots,
+        # so it can be reused only if all three are unchanged from the previous draw
+        if(calc_all_bases){
+          recalc <- TRUE
+        }else{
+          recalc <- !identical(feat[[idx_use[i]]][[j]], feat[[idx_use[i-1]]][[j]])  ||
+            !identical(proj_dir[[idx_use[i]]][[j]], proj_dir[[idx_use[i-1]]][[j]])  ||
+            !identical(knots[[idx_use[i]]][[j]], knots[[idx_use[i-1]]][[j]])
+        }
+
         if(is.na(knots[[idx_use[i]]][[j]][1])){ # No continuous features in this basis
           basis_idx <- basis_idx_start
           basis_idx_start <- basis_idx_start + 1
-          if(is.na(proj_dir[[idx_use[i]]][[j]][1])){ # all categorical features in this basis
-            if(calc_all_bases){
+          if(recalc){
+            if(is.na(proj_dir[[idx_use[i]]][[j]][1])){ # all categorical features in this basis
               ridge_basis[[j]] <- get_cat_basis(newdata[, feat[[idx_use[i]]][[j]], drop = FALSE])
-            }
-          }else{ # some discrete quantitative features in this basis
-            if(calc_all_bases  ||
-               n_act[[idx_use[i]]][j] != n_act[[idx_use[i-1]]][j]  ||
-               any(proj_dir[[idx_use[i]]][[j]] != proj_dir[[idx_use[i-1]]][[j]])){
+            }else{ # some discrete quantitative features in this basis
               ridge_basis[[j]] <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
             }
           }
         }else{ # At least one continuous feature in this basis
           basis_idx <- basis_idx_start:(basis_idx_start + df_spline - 1)
           basis_idx_start <- basis_idx_start + df_spline
-          if(calc_all_bases  ||
-             n_act[[idx_use[i]]][j] != n_act[[idx_use[i-1]]][j]  ||
-             knots[[idx_use[i]]][[j]][1] != knots[[idx_use[i-1]]][[j]][1]){
+          if(recalc){
             proj <- newdata[, feat[[idx_use[i]]][[j]], drop = FALSE] %*% proj_dir[[idx_use[i]]][[j]]
             ridge_basis[[j]] <- get_mns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
           }
