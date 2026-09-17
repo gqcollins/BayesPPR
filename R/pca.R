@@ -3,6 +3,7 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
     stop('prop_var must be between 0 and 1')
   }
 
+  X <- as.matrix(X)
   n <- nrow(X)
   Y <- as.matrix(Y)
 
@@ -25,9 +26,13 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
     warning("Caution: because Y is square, please ensure that each row of X corresponds to a row of Y (and not a column)")
   }
 
+  n_pc_max <- min(n, D) # The SVD yields at most min(n, D) components
   if(!is.null(n_pc)){
-    if(n_pc > max(n, D)){
-      n_pc <- max(n, D)
+    if(n_pc < 1){
+      stop('n_pc must be at least 1')
+    }
+    if(n_pc > n_pc_max){
+      n_pc <- n_pc_max
       warning('n_pc too large, using all PCs intead')
     }
   }
@@ -45,6 +50,10 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
 
   if(is.null(n_pc)){
     n_pc <- which(cumsum(ev_Y / sum(ev_Y)) > prop_var)[1]
+    if(is.na(n_pc)){ # prop_var is not exceeded even by all components (e.g. prop_var == 1)
+      n_pc <- n_pc_max
+    }
+    n_pc <- min(n_pc, n_pc_max)
   }
 
   basis_Y <- svd_Y$u[, 1:n_pc, drop=FALSE] %*% diag(svd_Y$d[1:n_pc], nrow = n_pc) # columns are basis functions
@@ -60,4 +69,12 @@ pca_setup <- function(X, Y, n_pc = NULL, prop_var = 0.99){
 
 pca_reverse <- function(preds_Y_new, pca_Y){
   pca_Y$basis_Y %*% t(preds_Y_new) * pca_Y$sd_Y + pca_Y$mn_Y
+}
+
+get_n_cores_max <- function(){ # detectCores() returns NA when it cannot detect the core count
+  n_cores_max <- parallel::detectCores()
+  if(is.na(n_cores_max)){
+    n_cores_max <- 1
+  }
+  return(n_cores_max)
 }

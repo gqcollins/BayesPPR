@@ -51,11 +51,24 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
   }
 
   # Pre-processing
+  X <- as.matrix(X)
+  if(!is.numeric(X)){
+    stop('X must be numeric. Categorical features should be coded as numeric.')
+  }
+  y <- as.numeric(y)
   n <- length(y)
   p <- ncol(X)
+  if(nrow(X) != n){
+    stop('nrow(X) must equal length(y)')
+  }
+  if(anyNA(X)  ||  anyNA(y)){
+    stop('X and y must not contain missing values')
+  }
 
   if(is.null(w_feat)){
     w_feat <- rep(1, p)
+  }else if(length(w_feat) != p){
+    stop('w_feat must have length ncol(X)')
   }
 
   mn_X <- sd_X <- numeric(p)
@@ -84,13 +97,25 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
     }
   }
 
-  if(is.null(n_act_max)){
-    n_cat <- sum(feat_type == 'cat')
-    n_act_max <- min(3, p - n_cat) + min(3, ceiling(n_cat/2))
+  # Features with zero weight (e.g. constant columns) can never be proposed
+  feat_usable <- which(w_feat > 0)
+  p_use <- length(feat_usable)
+  if(p_use == 0){
+    stop('no usable features in X. All features are constant or have zero weight in w_feat.')
   }
+
+  if(is.null(n_act_max)){
+    n_cat <- sum(feat_type[feat_usable] == 'cat')
+    n_act_max <- min(3, p_use - n_cat) + min(3, ceiling(n_cat/2))
+  }else if(n_act_max > p_use){
+    warning(paste0('n_act_max cannot exceed the number of usable features. Setting n_act_max = ', p_use))
+  }
+  n_act_max <- min(n_act_max, p_use)
 
   if(is.null(w_n_act)){
     w_n_act <- rep(1, n_act_max)
+  }else if(length(w_n_act) != n_act_max){
+    stop('w_n_act must have length n_act_max')
   }
 
   if(is.null(scale_proj_dir_prop)){
@@ -191,14 +216,12 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           n_basis_ridge[j + 1] <- 1
           if(any(feat_type[feat[[1]][[j]]] == 'disc')){
             ridge_type[j] <- 'disc'
-            n_basis_ridge[j + 1] <- 1
             j_quant <- c(j_quant, j)
             basis_mat <- cbind(basis_mat, X_st[, feat[[1]][[j]], drop = FALSE] %*% proj_dir[[1]][[j]])
             basis_idx[[j + 1]] <- basis_idx_start
             basis_idx_start <- basis_idx_start + 1
           }else{
             ridge_type[j] <- 'cat'
-            n_basis_ridge[j] <- 1
             basis_mat <- cbind(basis_mat, get_cat_basis(X_st[, feat[[1]][[j]], drop = FALSE]))
             basis_idx[[j + 1]] <- basis_idx_start
             basis_idx_start <- basis_idx_start + 1
@@ -276,10 +299,10 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
         if(adapt_act_feat){
           log_mh_act_feat <- -(log(n_act_max) + log(w_n_act[n_act_prop]/sum(w_n_act))) # Nott, Kuk, Duc for n_act
           if(n_act_prop == 1){
-            feat_prop <- sample(p, 1)
+            feat_prop <- feat_usable[sample(p_use, 1)] # Uniform over usable features, so no adjustment is needed
           }else{
             feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
-            log_mh_act_feat <- log_mh_act_feat - (lchoose(p, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
+            log_mh_act_feat <- log_mh_act_feat - (lchoose(p_use, n_act_prop) + log(dwallenius(w_feat, feat_prop))) # Nott, Kuk, Duc for feat
           }
         }else{
           feat_prop <- sample(p, n_act_prop, prob = w_feat) # Propose features to include
@@ -386,7 +409,7 @@ bppr <- function(X, y, n_ridge_mean = 10, n_ridge_max = NULL, n_act_max = NULL, 
           w_feat_prop <- w_feat
           w_feat_prop[feat_prop] <- w_feat_prop[feat_prop] - 1
           if(n_act_prop > 1){
-            log_mh_act_feat <- log_mh_act_feat + lchoose(p, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
+            log_mh_act_feat <- log_mh_act_feat + lchoose(p_use, n_act_prop) + log(dwallenius(w_feat_prop, feat_prop)) # Nott, Kuk, and Duc
           }
         }
 

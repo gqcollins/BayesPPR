@@ -45,7 +45,11 @@ bppr_pca <- function(X, Y, n_pc = NULL, prop_var = 0.99, n_cores = 1, par_type =
   pca_Y <- pca_setup(X, Y, n_pc = n_pc, prop_var = prop_var)
   n_pc <- pca_Y$n_pc
 
-  n_cores_max <- parallel::detectCores()
+  if(!par_type %in% c('fork', 'socket')){
+    stop("par_type must be either 'fork' or 'socket'")
+  }
+
+  n_cores_max <- get_n_cores_max()
 
   if(n_cores > n_cores_max){
     warning(paste0("Specified n_cores = ", n_cores, ". Proceeding with n_cores = min(n_cores, n_pc, detectCores()) = ",
