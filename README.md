@@ -14,7 +14,7 @@ BayesPPR is an R package used for fitting a Bayesian Projection Pursuit Regressi
 
 ### Installation
 ------------------------------------------------------------------------------
-v0.1.0 is on [CRAN](https://cran.r-project.org/package=BayesPPR) and can
+v0.2.0 is on [CRAN](https://cran.r-project.org/package=BayesPPR) and can
 be installed as
 
 ``` r
