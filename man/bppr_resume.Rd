@@ -11,7 +11,8 @@ bppr_resume(
   n_burn = 9000,
   n_adapt = 0,
   n_thin = 1,
-  print_every = 1000
+  print_every = 1000,
+  y = NULL
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ bppr_resume(
 \item{n_thin}{keep every n_thin posterior draws after burn-in.}
 
 \item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
+
+\item{y}{optional new response vector (for \code{"bppr"} objects only). If \code{NULL}, the response of \code{object} is used.}
 }
 \value{
 An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
@@ -37,6 +40,8 @@ Resumes fitting a BayesPPR model where the last Markov chain left off, using the
 }
 \details{
 Continues exploring BayesPPR model space using RJMCMC, beginning at the values contained in the last iteration of \code{object}.
+
+If \code{object} was fitted with \code{keep_sampler = TRUE}, the chain continues from its live \link{bppr_sampler} in \code{object$sampler}, with its adapted proposal weights, without rebuilding its state, and the result carries the same sampler. The sampler is an environment, so this also advances the sampler seen by \code{object}. Otherwise the chain state is rebuilt from the last draw of \code{object}.
 }
 \seealso{
 \link{predict.bppr} for prediction.

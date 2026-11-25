@@ -1,5 +1,20 @@
 # BayesPPR (development version)
 
+* New `bppr_sampler()`: a persistent BayesPPR chain that can be advanced a few
+  iterations at a time with `$step()`, and whose response can be replaced with
+  `$set_y()` at O(nK) cost without rebuilding the basis. This is for BayesPPR
+  as one block of a larger Gibbs sampler. `bppr()` now runs on it, and gives
+  draws identical to before.
+* `bppr(keep_sampler = TRUE)` keeps the live chain in `$sampler`;
+  `bppr_resume()` continues it directly, and takes a new response `y`.
+* New `intercept = FALSE` option: no intercept, with every ridge function's
+  basis centred at its training means, so each draw of f averages zero over
+  the training inputs.
+* New `s2_shape`, `s2_rate` (inverse-gamma prior on the residual variance;
+  default `0, 0` is the previous improper prior) and `s2_fixed` options.
+* Fixed the birth/death proposal ratio at the start of a resumed chain, which
+  was set to that of an empty model.
+
 # BayesPPR 0.2.0
 
 # BayesPPR 0.1.0.9000

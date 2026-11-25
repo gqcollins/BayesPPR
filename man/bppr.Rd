@@ -25,7 +25,12 @@ bppr(
   n_adapt = 0,
   n_thin = 1,
   print_every = 1000,
-  bppr_init = NULL
+  bppr_init = NULL,
+  intercept = TRUE,
+  s2_shape = 0,
+  s2_rate = 0,
+  s2_fixed = NULL,
+  keep_sampler = FALSE
 )
 }
 \arguments{
@@ -70,6 +75,14 @@ bppr(
 \item{print_every}{print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.}
 
 \item{bppr_init}{list of initial values for the Markov chain. Used by \link{bppr_resume}.}
+
+\item{intercept}{logical; if \code{FALSE}, the model has no intercept and the basis functions of every ridge function are centred at their training means, so every draw of \eqn{f} averages zero over the training inputs.}
+
+\item{s2_shape, s2_rate}{shape and rate of an inverse-gamma prior on the residual variance \eqn{\sigma^2}. The default \code{0, 0} is the improper prior \eqn{1/\sigma^2}.}
+
+\item{s2_fixed}{if not \code{NULL}, \eqn{\sigma^2} is fixed at this value and not sampled.}
+
+\item{keep_sampler}{logical; if \code{TRUE}, the returned object carries the live chain in \code{$sampler} (a \link{bppr_sampler}), so it can be continued, with a new response if desired, by \link{bppr_resume} without rebuilding its state.}
 }
 \value{
 An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.

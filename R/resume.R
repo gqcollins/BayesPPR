@@ -12,16 +12,38 @@
 #' @param n_adapt number of adaptive MCMC iterations to perform before burn-in. Skips sampling basis coefficients and residual variance to save time.
 #' @param n_thin keep every n_thin posterior draws after burn-in.
 #' @param print_every print the iteration number every print_every iterations. Use \code{print_every = 0} to silence.
+#' @param y optional new response vector (for \code{"bppr"} objects only). If \code{NULL}, the response of \code{object} is used.
 #' @details Continues exploring BayesPPR model space using RJMCMC, beginning at the values contained in the last iteration of \code{object}.
+#'
+#' If \code{object} was fitted with \code{keep_sampler = TRUE}, the chain continues from its live \link{bppr_sampler} in \code{object$sampler}, with its adapted proposal weights, without rebuilding its state, and the result carries the same sampler. The sampler is an environment, so this also advances the sampler seen by \code{object}. Otherwise the chain state is rebuilt from the last draw of \code{object}.
 #' @return An object of class \code{"bppr"}. Predictions can be obtained by passing the entire object to the \code{predict.bppr} function.
 #' @keywords nonparametric projection pursuit regression splines
 #' @seealso \link{predict.bppr} for prediction.
 #' @export
 #' @import stats
 #' @import utils
-bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = 1000){
+bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_adapt = 0, n_thin = 1, print_every = 1000, y = NULL){
 
-  if(methods::is(object,"bppr")){
+  if(methods::is(object,"bppr")  &&  !is.null(object$sampler)){
+    if(n_thin > n_post){
+      stop('n_thin > n_post. No posterior samples will be obtained.')
+    }
+    n_post <- n_post - n_post %% n_thin
+    if(object$prior_coefs == 'flat'){
+      n_adapt <- n_adapt + n_burn
+      n_burn <- 0
+    }
+    sampler <- object$sampler
+    if(!is.null(y)) sampler$set_y(y)
+    sampler$clear_saved()
+    print_every <- run_bppr_chain(sampler, n_post = n_post, n_burn = n_burn, n_adapt = n_adapt,
+                                  n_thin = n_thin, print_every = print_every)
+    fit <- sampler$as_bppr(n_post = n_post, n_burn = n_burn,
+                           n_adapt = n_adapt, n_thin = n_thin, print_every = print_every,
+                           bppr_init = sampler$current(), call = match.call())
+    fit$sampler <- sampler
+    if(append) fit <- append_bppr_draws(object, fit)
+  }else if(methods::is(object,"bppr")){
     n_keep <- object$n_keep
     if(object$prior_coefs == 'zs'){
       var_coefs_init <- object$var_coefs[n_keep]
@@ -35,7 +57,7 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
                       sd_resid = object$sd_resid[n_keep], var_coefs = var_coefs_init,
                       w_n_act = object$w_n_act, w_feat = object$w_feat)
 
-    fit <- bppr(X = object$X, y = object$y, n_ridge_mean = object$n_ridge_mean,
+    fit <- bppr(X = object$X, y = if(is.null(y)) object$y else y, n_ridge_mean = object$n_ridge_mean,
                 n_ridge_max = object$n_ridge_max, n_act_max = object$n_act_max,
                 df_spline = object$df_spline, prob_relu = object$prob_relu,
                 prior_coefs = object$prior_coefs, shape_var_coefs = object$shape_var_coefs,
@@ -44,23 +66,15 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
                 adapt_act_feat = object$adapt_act_feat, w_n_act = object$w_n_act,
                 w_feat = object$w_feat, n_post = n_post, n_burn = n_burn,
                 n_adapt = n_adapt, n_thin = n_thin, print_every = print_every,
-                bppr_init = bppr_init)
+                bppr_init = bppr_init,
+                intercept = is.null(object$intercept)  ||  isTRUE(object$intercept),
+                s2_shape = if(is.null(object$s2_shape)) 0 else object$s2_shape,
+                s2_rate = if(is.null(object$s2_rate)) 0 else object$s2_rate,
+                s2_fixed = object$s2_fixed)
 
-    if(append){
-      fit$n_ridge <- c(object$n_ridge, fit$n_ridge)
-      fit$n_act <- c(object$n_act, fit$n_act)
-      fit$feat <- c(object$feat, fit$feat)
-      fit$proj_dir <- c(object$proj_dir, fit$proj_dir)
-      fit$knots <- c(object$knots, fit$knots)
-      fit$coefs <- c(object$coefs, fit$coefs)
-      fit$sd_resid <- c(object$sd_resid, fit$sd_resid)
-      fit$var_coefs <- c(object$var_coefs, fit$var_coefs)
-      fit$n_keep <- object$n_keep + fit$n_keep
-      fit$n_post <- c(object$n_post, fit$n_post)
-      fit$n_burn <- c(object$n_burn, fit$n_burn)
-      fit$n_adapt <- c(object$n_adapt, fit$n_adapt)
-    }
+    if(append) fit <- append_bppr_draws(object, fit)
   }else if(methods::is(object,"bppr_pca")){
+    if(!is.null(y)) stop("a new 'y' is only supported for 'bppr' objects")
     n_keep <- object$fit_list[[1]]$n_keep
 
     bppr_init_list <- lapply(1:object$pca_Y$n_pc, function(k){
@@ -110,4 +124,22 @@ bppr_resume <- function(object, append = FALSE, n_post = 1000, n_burn = 9000, n_
   }
 
   return(fit)
+}
+
+# Draws of fit appended to those of object
+append_bppr_draws <- function(object, fit){
+  fit$n_ridge <- c(object$n_ridge, fit$n_ridge)
+  fit$n_act <- c(object$n_act, fit$n_act)
+  fit$feat <- c(object$feat, fit$feat)
+  fit$proj_dir <- c(object$proj_dir, fit$proj_dir)
+  fit$knots <- c(object$knots, fit$knots)
+  fit$coefs <- c(object$coefs, fit$coefs)
+  fit$sd_resid <- c(object$sd_resid, fit$sd_resid)
+  fit$var_coefs <- c(object$var_coefs, fit$var_coefs)
+  if(!is.null(fit$basis_mn)) fit$basis_mn <- c(object$basis_mn, fit$basis_mn)
+  fit$n_keep <- object$n_keep + fit$n_keep
+  fit$n_post <- c(object$n_post, fit$n_post)
+  fit$n_burn <- c(object$n_burn, fit$n_burn)
+  fit$n_adapt <- c(object$n_adapt, fit$n_adapt)
+  fit
 }

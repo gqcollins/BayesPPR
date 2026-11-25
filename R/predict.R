@@ -39,6 +39,8 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
   knots <- object$knots
   df_spline <- object$df_spline
   n_keep <- object$n_keep
+  intercept <- is.null(object$intercept)  ||  isTRUE(object$intercept)
+  basis_mn <- object$basis_mn # column means of the centred bases (intercept = FALSE)
 
   if(is.null(idx_use)){
     idx_use <- 1:n_keep
@@ -51,14 +53,14 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
 
   preds <- matrix(0, nrow = n_use, ncol = n)
   for(i in 1:n_use){
-    preds[i, ] <- coefs[[idx_use[i]]][1]
+    preds[i, ] <- if(intercept) coefs[[idx_use[i]]][1] else 0
     calc_all_bases <- (i == 1)
     if(n_ridge[idx_use[i]] > 0){
       if(!calc_all_bases  &&  n_ridge[idx_use[i]] != n_ridge[idx_use[i-1]]){
         calc_all_bases <- TRUE
         ridge_basis <- vector('list', n_ridge[idx_use[i]])
       }
-      basis_idx_start <- 2
+      basis_idx_start <- if(intercept) 2 else 1
       for(j in 1:n_ridge[idx_use[i]]){
         # A ridge function's basis is determined by its features, direction, and knots,
         # so it can be reused only if all three are unchanged from the previous draw
@@ -88,7 +90,11 @@ predict.bppr <- function(object, newdata, idx_use = NULL, ...){
             ridge_basis[[j]] <- get_mns_basis(proj, knots[[idx_use[i]]][[j]]) # Get basis function
           }
         }
-        preds[i, ] <- preds[i, ] + ridge_basis[[j]] %*% coefs[[idx_use[i]]][basis_idx] # Get predictions for jth basis function
+        if(intercept){
+          preds[i, ] <- preds[i, ] + ridge_basis[[j]] %*% coefs[[idx_use[i]]][basis_idx] # Get predictions for jth basis function
+        }else{
+          preds[i, ] <- preds[i, ] + sweep(ridge_basis[[j]], 2, basis_mn[[idx_use[i]]][[j]]) %*% coefs[[idx_use[i]]][basis_idx]
+        }
       }
     }
   }
